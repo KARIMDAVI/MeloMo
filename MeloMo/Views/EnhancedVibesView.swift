@@ -114,6 +114,13 @@ struct EnhancedVibesView: View {
     // MARK: - Header Section
     private var headerSection: some View {
         VStack(spacing: 16) {
+            // Natural language / voice mood input — above category pills per UX design
+            NLMoodInputView { mood in
+                Task { await musicController.generate(for: mood) }
+            }
+            .environmentObject(musicController)
+            .padding(.horizontal, 0)
+
             // Category Tabs
             categoryTabsSection
             
