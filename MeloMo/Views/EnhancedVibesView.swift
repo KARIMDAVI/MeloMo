@@ -424,19 +424,7 @@ struct EnhancedVibesView: View {
         onMoodColorChange(mood.backgroundColor.primary, mood.backgroundColor.secondary)
         
         Task {
-            // Convert EnhancedMood to regular Mood for compatibility
-            let regularMood = Mood(
-                emoji: mood.emoji,
-                imageName: mood.imageName,
-                title: mood.title,
-                description: mood.description,
-                seeds: mood.seeds,
-                energy: mood.energy,
-                category: mood.category,
-                popularity: mood.popularity
-            )
-            
-            await musicController.generate(for: regularMood)
+            await musicController.generate(for: mood)
             
             // Check if music generation was successful and update UI accordingly
             if musicController.lastGeneratedLink != nil {

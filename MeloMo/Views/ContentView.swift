@@ -235,7 +235,7 @@ struct ContentView: View {
                     
                     // Mood grid
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
-                        ForEach(Array(allMoods.prefix(6)), id: \.id) { mood in
+                        ForEach(Array(enhancedMoods.prefix(6)), id: \.id) { mood in
                             MoodCard(mood: mood, isFavorite: false, onTap: {
                                 Task {
                                     await musicController.generate(for: mood)
