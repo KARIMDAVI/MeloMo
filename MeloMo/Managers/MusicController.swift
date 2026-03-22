@@ -71,6 +71,7 @@ final class MusicController: ObservableObject {
         defer { isLoading = false }
 
         addToRecentMoods(mood)
+        StreakManager.shared.recordActivity()   // consecutive-day streak
         statistics.totalPlaylistsGenerated += 1
         statistics.lastUsedDate = Date()
         saveStatistics()
@@ -112,6 +113,21 @@ final class MusicController: ObservableObject {
                 errorMessage = error.localizedDescription
                 Haptics.error()
             }
+        }
+    }
+
+    /// NL text path — classifies free text and updates moodSuggestions for the UI.
+    /// Runs in parallel with the on-device fallback in NLMoodInputView.
+    func generate(forText input: String) async {
+        guard !isLoading else { return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let response = try await BackendClient.shared.generatePlaylist(input: input)
+            backendResponse = response
+            moodSuggestions = response.topMoods
+        } catch {
+            moodSuggestions = []    // Silent fallback — on-device classifier already handled the pick
         }
     }
 

@@ -21,13 +21,10 @@ struct MeloMoApp: App {
     }
     
     private func setupApp() {
-        // Configure app appearance
         configureAppearance()
-        
-        // Request notification permissions if needed
         requestNotificationPermissions()
-        
-        // Log app launch
+        // Schedule after permissions are requested — center silently no-ops if denied
+        StreakManager.shared.scheduleDailyNotification()
         print("🎵 MeloMo launched successfully!")
     }
     

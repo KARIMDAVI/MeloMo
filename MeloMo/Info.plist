@@ -21,6 +21,10 @@
 	<string>MeloMo needs access to your Apple Music library to create personalized playlists based on your mood.</string>
 	<key>NSMusicUsageDescription</key>
 	<string>MeloMo uses your music library to enhance your listening experience.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>MeloMo uses the microphone to let you describe your mood by voice.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>MeloMo converts your voice into a mood description to find the perfect playlist.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>spotify</string>
