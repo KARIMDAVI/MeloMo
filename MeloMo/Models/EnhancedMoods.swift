@@ -347,7 +347,7 @@ let enhancedMoods: [EnhancedMood] = [
     ),
     
     EnhancedMood(
-        emoji: "🎭",
+        emoji: "🌑",
         imageName: "Melancholy",
         title: "Melancholy",
         description: "Thoughtful and wistful",
@@ -476,7 +476,7 @@ let enhancedMoods: [EnhancedMood] = [
     ),
     
     EnhancedMood(
-        emoji: "⚡",
+        emoji: "🌩️",
         imageName: "Hype",
         title: "Electric",
         description: "Charged and dynamic",
