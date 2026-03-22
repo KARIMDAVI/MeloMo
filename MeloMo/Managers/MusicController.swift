@@ -33,6 +33,11 @@ final class MusicController: ObservableObject {
     @Published var recentMoods: [EnhancedMood] = []   // was [Mood] — migrated to EnhancedMood
     @Published var favoriteMoods: [EnhancedMood] = [] // was [Mood] — migrated to EnhancedMood
     @Published var currentTrackArtworkURL: URL? = nil
+    @Published var playbackSource: PlaybackSource = .youtube
+    @Published var jamendoPlayer = JamendoPlayer()
+    @Published var youtubeManager = YouTubePlaybackManager()
+    @Published var backendResponse: MoodGenerateResponse? = nil
+    @Published var moodSuggestions: [MoodSuggestion] = []
 
     // MARK: - Private Properties
     private let log = Logger(subsystem: "com.melomo.app", category: "music")
@@ -51,16 +56,12 @@ final class MusicController: ObservableObject {
 
     // MARK: - Public Methods
 
-    /// Generate & play (Apple Music) or handoff (Spotify/YouTube Music).
-    /// Now accepts EnhancedMood directly — no more conversion at call sites.
+    /// Generate playlist via backend. Routes to Jamendo, YouTube, or Apple Music based on mood.
+    /// Falls back to on-device NL classifier if backend is unavailable (Render cold start).
     func generate(for mood: EnhancedMood) async {
         guard !isLoading else { Haptics.warning(); return }
-
-        // Prevent rapid successive generations (2s debounce)
-        if let lastTime = lastGenerationTime,
-           Date().timeIntervalSince(lastTime) < 2.0 {
-            Haptics.warning()
-            return
+        guard Date().timeIntervalSince(lastGenerationTime ?? .distantPast) >= 2 else {
+            Haptics.warning(); return
         }
 
         currentMood = mood
@@ -70,18 +71,47 @@ final class MusicController: ObservableObject {
         defer { isLoading = false }
 
         addToRecentMoods(mood)
-
         statistics.totalPlaylistsGenerated += 1
         statistics.lastUsedDate = Date()
-        statistics.mostUsedProvider = provider
         saveStatistics()
-
         Haptics.moodSelected()
 
-        switch provider {
-        case .appleMusic:    await generateAppleMusicPlaylist(mood: mood)
-        case .spotify:       await generateSpotifyPlaylist(mood: mood)
-        case .youtubeMusic:  await generateYoutubeMusicPlaylist(mood: mood)
+        do {
+            let response = try await BackendClient.shared.generatePlaylist(input: mood.title)
+            backendResponse = response
+            moodSuggestions = response.topMoods
+
+            // rawValue matching fails for "youtube" vs "YouTube" — lowercase switch is safer
+            let source: PlaybackSource
+            switch response.source.lowercased() {
+            case "jamendo":     source = .jamendo
+            case "apple_music": source = .appleMusic
+            default:            source = .youtube
+            }
+            playbackSource = source
+
+            let tracks = response.tracks.map { $0.toMusicTrack() }
+            switch source {
+            case .jamendo:
+                jamendoPlayer.load(tracks: tracks)
+            case .youtube:
+                let videoIds = response.tracks.compactMap { $0.videoId }
+                youtubeManager.load(tracks: tracks, videoIds: videoIds)
+            case .appleMusic:
+                // Apple Music flow unchanged — backend doesn't control MusicKit playback
+                await generateAppleMusicPlaylist(mood: mood)
+            }
+            Haptics.playlistGenerated()
+        } catch {
+            // On backend failure, fall back to Apple Music search via on-device classifier
+            if let fallbackTitle = MoodFallbackClassifier.classify(mood.title),
+               let _ = enhancedMoods.first(where: { $0.title == fallbackTitle }) {
+                errorMessage = "Using offline mode — backend unavailable"
+                await generateAppleMusicPlaylist(mood: mood)
+            } else {
+                errorMessage = error.localizedDescription
+                Haptics.error()
+            }
         }
     }
 

@@ -447,7 +447,7 @@ let enhancedMoods: [EnhancedMood] = [
     ),
     
     EnhancedMood(
-        emoji: "🎭",
+        emoji: "🎪",
         imageName: "Magical",
         title: "Dramatic",
         description: "Theatrical and intense",
