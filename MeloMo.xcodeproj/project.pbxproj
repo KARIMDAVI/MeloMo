@@ -610,7 +610,7 @@
 			repositoryURL = "https://github.com/thii/FontAwesome.swift";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 5.15.0;
+				minimumVersion = 1.0.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

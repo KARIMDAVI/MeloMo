@@ -1,5 +1,5 @@
 {
-  "originHash" : "4fc3370add3d24036d77c801842094a6f9ee280c65b875dd1995acdf0b3472e2",
+  "originHash" : "1d8cb9752fda3665a67b50e14f514eb02ba355de5623aa56eb6ed91eab941687",
   "pins" : [
     {
       "identity" : "app-check",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "145104f5ea9d58ae21b60add007c33c1cc0c948e",
         "version" : "2.0.0"
+      }
+    },
+    {
+      "identity" : "fontawesome.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/thii/FontAwesome.swift",
+      "state" : {
+        "revision" : "07883a32d49dfc7bdedbeea115067b53dfbeeb43",
+        "version" : "1.9.1"
       }
     },
     {
