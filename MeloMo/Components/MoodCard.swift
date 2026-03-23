@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct MoodCard: View {
-    let mood: Mood
+    let mood: EnhancedMood
     let isFavorite: Bool
     let onTap: () -> Void
     let onFavorite: () -> Void
@@ -144,16 +144,7 @@ struct MoodCard: View {
 
 #Preview {
     MoodCard(
-        mood: Mood(
-            emoji: "😀",
-            imageName: "happy",
-            title: "Happy",
-            description: "Feeling joyful and upbeat",
-            seeds: ["feel good", "pop uplifting", "good vibes"],
-            energy: 0.9,
-            category: .energetic,
-            popularity: 5
-        ),
+        mood: enhancedMoods.first!,
         isFavorite: true,
         onTap: {},
         onFavorite: {},

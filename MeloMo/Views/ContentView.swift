@@ -28,69 +28,36 @@ struct ContentView: View {
                 // Top Header
                 topHeader
                 
-                // Main Content
+                // Main Content — 4 tabs: Vibes / Library / Stats / Profile
                 TabView(selection: $selectedTab) {
-                    // Vibes Tab - Always available
                     EnhancedVibesView(onMoodColorChange: { primary, secondary in
                         currentMoodColors = (primary: primary, secondary: secondary)
                     })
+                    .environmentObject(musicController)
+                    .tabItem { Label("Vibes", systemImage: "music.note") }
+                    .tag(0)
+
+                    LibraryView()
                         .environmentObject(musicController)
-                        .tabItem {
-                            Image(systemName: "music.note")
-                            Text("Vibes")
-                        }
-                        .tag(0)
-                    
-                    // Stats Tab - Only for signed-in users
+                        .tabItem { Label("Library", systemImage: "square.stack") }
+                        .tag(1)
+
+                    // Stats gated behind sign-in — streak data is per-user
                     if authManager.isSignedIn {
-                        statsView
-                            .tabItem {
-                                Image(systemName: "chart.bar")
-                                Text("Stats")
-                            }
-                            .tag(1)
-                    } else {
-                        signInRequiredView(title: "Stats", icon: "chart.bar", description: "Track your listening habits, achievements, and music journey.")
-                            .tabItem {
-                                Image(systemName: "chart.bar")
-                                Text("Stats")
-                            }
-                            .tag(1)
-                    }
-                    
-                    // Challenges Tab - Only for signed-in users
-                    if authManager.isSignedIn {
-                        challengesView
-                            .tabItem {
-                                Image(systemName: "trophy")
-                                Text("Challenges")
-                            }
+                        StatsView()
+                            .environmentObject(musicController)
+                            .tabItem { Label("Stats", systemImage: "chart.bar") }
                             .tag(2)
                     } else {
-                        signInRequiredView(title: "Challenges", icon: "trophy", description: "Test your music knowledge with trivia challenges")
-                            .tabItem {
-                                Image(systemName: "trophy")
-                                Text("Challenges")
-                            }
+                        signInRequiredView(title: "Stats", icon: "chart.bar",
+                                           description: "Track your mood streaks, favorite vibes, and playlist history.")
+                            .tabItem { Label("Stats", systemImage: "chart.bar") }
                             .tag(2)
                     }
-                    
-                    // Settings Tab - Only for signed-in users
-                    if authManager.isSignedIn {
-                        settingsView
-                            .tabItem {
-                                Image(systemName: "gear")
-                                Text("Settings")
-                            }
-                            .tag(3)
-                    } else {
-                        signInRequiredView(title: "Settings", icon: "gear", description: "Customize your app experience and manage your account")
-                            .tabItem {
-                                Image(systemName: "gear")
-                                Text("Settings")
-                            }
-                            .tag(3)
-                    }
+
+                    settingsView
+                        .tabItem { Label("Profile", systemImage: "person.circle") }
+                        .tag(3)
                 }
                 .accentColor(.yellow)
             }
@@ -235,7 +202,7 @@ struct ContentView: View {
                     
                     // Mood grid
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
-                        ForEach(Array(allMoods.prefix(6)), id: \.id) { mood in
+                        ForEach(Array(enhancedMoods.prefix(6)), id: \.id) { mood in
                             MoodCard(mood: mood, isFavorite: false, onTap: {
                                 Task {
                                     await musicController.generate(for: mood)
