@@ -11,7 +11,8 @@ final class YouTubePlaybackManager: ObservableObject {
 
     // autoPlay: true so loading a video starts immediately without user tap
     // showControls: false because NowPlayingView provides its own playback controls
-    let player = YouTubePlayer(configuration: .init(autoPlay: true, showControls: false))
+    // autoPlay/showControls live on Parameters, not Configuration (v2 API change)
+    let player = YouTubePlayer(parameters: .init(autoPlay: true, showControls: false))
 
     private var queue: [MusicTrack] = []
     private var videoIds: [String] = []

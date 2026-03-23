@@ -15,6 +15,7 @@ final class SavedPlaylist {
     var trackCount: Int
     var createdAt: Date
     var trackData: Data          // JSON-encoded [MusicTrack] — flat storage avoids SwiftData relationship complexity
+    var exportedTo: [String]     // destination keys: "spotify", "apple_music", "youtube_music"
 
     init(
         id: String = UUID().uuidString,
@@ -32,7 +33,7 @@ final class SavedPlaylist {
         self.providerRaw = provider.rawValue
         self.trackCount = tracks.count
         self.createdAt = createdAt
-        // If encoding fails (shouldn't happen), store empty array — silent fallback is fine here
+        self.exportedTo = []
         self.trackData = (try? JSONEncoder().encode(tracks)) ?? Data()
     }
 
