@@ -2,6 +2,7 @@
 // Coordinator between MusicController and YouTubePlayerKit.
 // YouTubePlayerKit renders via a SwiftUI view — this manager holds the queue and exposes controls.
 // The actual YouTubePlayerView is embedded in NowPlayingView (source must be set here).
+import Combine
 import YouTubePlayerKit
 
 @MainActor
@@ -43,7 +44,8 @@ final class YouTubePlaybackManager: ObservableObject {
     private func playCurrentTrack() {
         guard currentIndex < videoIds.count else { return }
         currentTrack = queue[safe: currentIndex]
-        player.source = .video(id: videoIds[currentIndex])
+        // source is internal(set) — must use the async load API
+        Task { try? await player.load(source: .video(id: videoIds[currentIndex])) }
         isPlaying = true
     }
 }
