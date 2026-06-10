@@ -29,5 +29,7 @@
 	<array>
 		<string>spotify</string>
 	</array>
+    <key>BackendURL</key>
+    <string>https://melomo-backend.onrender.com</string>
 </dict>
 </plist>

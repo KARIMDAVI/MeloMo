@@ -36,9 +36,19 @@ final class JamendoPlayer: ObservableObject {
     }
 
     private func playCurrentTrack() {
-        guard currentIndex < queue.count,
-              let url = queue[currentIndex].streamURL else { return }
-        currentTrack = queue[currentIndex]
+        guard currentIndex < queue.count else { return }
+        let track = queue[currentIndex]
+        currentTrack = track
+        
+        let url: URL
+        if let local = DownloadManager.shared.localURL(for: track.id) {
+            url = local
+        } else if let stream = track.streamURL {
+            url = stream
+        } else {
+            return
+        }
+        
         player = AVPlayer(url: url)
         player?.play()
         isPlaying = true

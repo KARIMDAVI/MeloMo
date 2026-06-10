@@ -9,6 +9,17 @@ import os
 // Orchestrates playback + playlist generation across all providers.
 // recentMoods / favoriteMoods use EnhancedMood so the UI never has to convert types.
 // generate(for:) accepts EnhancedMood directly — the bridge conversion in EnhancedVibesView is gone.
+private func getBroadGenre(_ mood: EnhancedMood) -> String {
+    switch mood.category {
+    case .energetic:              return mood.energy > 0.8 ? "upbeat pop dance" : "pop rock"
+    case .relaxed, .chill:        return "chill indie ambient"
+    case .emotional, .melancholy: return "indie ballad emotional"
+    case .focused:                return "instrumental focus classical"
+    case .social:                 return "party pop dance"
+    default:                      return "popular music"
+    }
+}
+
 @MainActor
 final class MusicController: ObservableObject {
     // MARK: - Published Properties
@@ -25,6 +36,7 @@ final class MusicController: ObservableObject {
 
     @Published var currentMood: EnhancedMood? = nil
     @Published var isAuthorizedForAppleMusic = false
+    @Published var isOfflineMode = false
     @Published var lastGeneratedLink: PlaylistLink? = nil
     @Published var isLoading = false
     @Published var errorMessage: String? = nil
@@ -38,6 +50,7 @@ final class MusicController: ObservableObject {
     @Published var youtubeManager = YouTubePlaybackManager()
     @Published var backendResponse: MoodGenerateResponse? = nil
     @Published var moodSuggestions: [MoodSuggestion] = []
+    @Published var trendingVibes: [[String: String]] = []
 
     // MARK: - Private Properties
     private let log = Logger(subsystem: "com.melomo.app", category: "music")
@@ -56,8 +69,13 @@ final class MusicController: ObservableObject {
 
     // MARK: - Public Methods
 
-    /// Generate playlist via backend. Routes to Jamendo, YouTube, or Apple Music based on mood.
-    /// Falls back to on-device NL classifier if backend is unavailable (Render cold start).
+    /**
+     Generates a playlist from the backend based on the provided mood.
+     
+     This function sends a request to the backend to generate a playlist. The backend will then route the request to the appropriate music provider (Jamendo, YouTube, or Apple Music) based on the mood. If the backend is unavailable, it will fall back to the on-device NL classifier.
+     
+     - Parameter mood: The mood to generate a playlist for.
+     */
     func generate(for mood: EnhancedMood) async {
         guard !isLoading else { Haptics.warning(); return }
         guard Date().timeIntervalSince(lastGenerationTime ?? .distantPast) >= 2 else {
@@ -71,6 +89,8 @@ final class MusicController: ObservableObject {
         defer { isLoading = false }
 
         addToRecentMoods(mood)
+        JournalManager.shared.logMood(title: mood.title, emoji: mood.emoji)
+        Task { await BackendClient.shared.publishVibe(mood: mood.title, emoji: mood.emoji) }
         StreakManager.shared.recordActivity()   // consecutive-day streak
         statistics.totalPlaylistsGenerated += 1
         statistics.lastUsedDate = Date()
@@ -116,8 +136,13 @@ final class MusicController: ObservableObject {
         }
     }
 
-    /// NL text path — classifies free text and updates moodSuggestions for the UI.
-    /// Runs in parallel with the on-device fallback in NLMoodInputView.
+    /**
+     Generates a playlist from the backend based on the provided text input.
+     
+     This function sends a request to the backend to generate a playlist. The backend will then classify the text and generate a playlist based on the classified mood. This function runs in parallel with the on-device fallback in NLMoodInputView.
+     
+     - Parameter input: The text to generate a playlist for.
+     */
     func generate(forText input: String) async {
         guard !isLoading else { return }
         isLoading = true
@@ -131,7 +156,80 @@ final class MusicController: ObservableObject {
         }
     }
 
+    /**
+     Generates a playlist based on the user's current biometrics (Magic Mood).
+     */
+    func generateMagicMood() async {
+        guard !isLoading else { return }
+        
+        // Request HealthKit authorization if needed
+        let authorized = await HealthKitManager.shared.requestAuthorization()
+        guard authorized else {
+            errorMessage = "HealthKit access required for Magic Mood."
+            Haptics.error()
+            return
+        }
+
+        isLoading = true
+        defer { isLoading = false }
+        
+        do {
+            let biometrics = await HealthKitManager.shared.fetchLatestBiometrics()
+            // We use a generic "How do I feel?" prompt which the backend will enrich with biometric data
+            let response = try await BackendClient.shared.generatePlaylist(input: "Detect my mood from biometrics", biometrics: biometrics)
+            
+            backendResponse = response
+            moodSuggestions = response.topMoods
+            
+            // Map the returned mood to an EnhancedMood if possible, otherwise use fallback logic
+            if let matchedMood = enhancedMoods.first(where: { $0.title.lowercased() == response.mood.lowercased() }) {
+                currentMood = matchedMood
+                addToRecentMoods(matchedMood)
+                JournalManager.shared.logMood(title: matchedMood.title, emoji: matchedMood.emoji, biometrics: biometrics)
+                Task { await BackendClient.shared.publishVibe(mood: matchedMood.title, emoji: matchedMood.emoji) }
+            }
+            
+            let source: PlaybackSource
+            switch response.source.lowercased() {
+            case "jamendo":     source = .jamendo
+            case "apple_music": source = .appleMusic
+            default:            source = .youtube
+            }
+            playbackSource = source
+            
+            let tracks = response.tracks.map { $0.toMusicTrack() }
+            switch source {
+            case .jamendo:
+                jamendoPlayer.load(tracks: tracks)
+            case .youtube:
+                let videoIds = response.tracks.compactMap { $0.videoId }
+                youtubeManager.load(tracks: tracks, videoIds: videoIds)
+            case .appleMusic:
+                if let mood = currentMood {
+                    await generateAppleMusicPlaylist(mood: mood)
+                }
+            }
+            Haptics.playlistGenerated()
+        } catch {
+            errorMessage = "Magic Mood failed: \(error.localizedDescription)"
+            Haptics.error()
+        }
+    }
+
     func requestAuthorization() async { await refreshAuthorizationStatus() }
+
+    func fetchTrendingVibes() async {
+        trendingVibes = await BackendClient.shared.getTrendingVibes()
+    }
+
+    func downloadCurrentPlaylist() {
+        guard playbackSource == .jamendo, let response = backendResponse else { return }
+        
+        for track in response.tracks {
+            DownloadManager.shared.download(track.toMusicTrack())
+        }
+        Haptics.successPattern()
+    }
 
     var isAuthorized: Bool { isAuthorizedForAppleMusic }
 
@@ -179,7 +277,11 @@ final class MusicController: ObservableObject {
 
     // MARK: - Authorization
 
-    /// Removed the dead do/catch wrapper — MusicAuthorization.request() is async, not throws.
+    /**
+     Refreshes the authorization status for Apple Music.
+     
+     This function checks the current authorization status for Apple Music and updates the `isAuthorizedForAppleMusic` property accordingly. It also requests authorization if the status is not determined.
+     */
     func refreshAuthorizationStatus() async {
         switch MusicAuthorization.currentStatus {
         case .authorized:
@@ -285,31 +387,36 @@ final class MusicController: ObservableObject {
 
         var songs: [Song] = []
 
-        // Strategy 1: original mood seeds
-        let originalQuery = mood.seeds.joined(separator: " OR ")
-        if !originalQuery.isEmpty {
-            var req = MusicCatalogSearchRequest(term: originalQuery, types: [Song.self])
-            req.limit = 25
-            if let response = try? await req.response() {
-                songs = Array(response.songs.prefix(25))
+        try await withThrowingTaskGroup(of: [Song].self) { group in
+            // Strategy 1: original mood seeds
+            let originalQuery = mood.seeds.joined(separator: " OR ")
+            if !originalQuery.isEmpty {
+                group.addTask {
+                    var req = MusicCatalogSearchRequest(term: originalQuery, types: [Song.self])
+                    req.limit = 25
+                    guard let response = try? await req.response() else { return [] }
+                    return Array(response.songs.prefix(25))
+                }
             }
-        }
 
-        // Strategy 2: mood title + "music"
-        if songs.isEmpty {
-            var req = MusicCatalogSearchRequest(term: "\(mood.title) music", types: [Song.self])
-            req.limit = 25
-            if let response = try? await req.response() {
-                songs = Array(response.songs.prefix(25))
+            // Strategy 2: mood title + "music"
+            group.addTask {
+                var req = MusicCatalogSearchRequest(term: "\(mood.title) music", types: [Song.self])
+                req.limit = 25
+                guard let response = try? await req.response() else { return [] }
+                return Array(response.songs.prefix(25))
             }
-        }
 
-        // Strategy 3: broad genre fallback
-        if songs.isEmpty {
-            var req = MusicCatalogSearchRequest(term: getBroadGenre(mood), types: [Song.self])
-            req.limit = 25
-            if let response = try? await req.response() {
-                songs = Array(response.songs.prefix(25))
+            // Strategy 3: broad genre fallback
+            group.addTask {
+                var req = MusicCatalogSearchRequest(term: getBroadGenre(mood), types: [Song.self])
+                req.limit = 25
+                guard let response = try? await req.response() else { return [] }
+                return Array(response.songs.prefix(25))
+            }
+
+            for try await searchedSongs in group {
+                songs.append(contentsOf: searchedSongs)
             }
         }
 
@@ -328,20 +435,11 @@ final class MusicController: ObservableObject {
         }
 
         // Shareable search URL for PlaylistLink storage
-        let shareQuery = originalQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? mood.title
+        let shareQuery = (mood.seeds.joined(separator: " OR ")).addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? mood.title
         return URL(string: "https://music.apple.com/search?term=\(shareQuery)")!
     }
 
-    private func getBroadGenre(_ mood: EnhancedMood) -> String {
-        switch mood.category {
-        case .energetic:              return mood.energy > 0.8 ? "upbeat pop dance" : "pop rock"
-        case .relaxed, .chill:        return "chill indie ambient"
-        case .emotional, .melancholy: return "indie ballad emotional"
-        case .focused:                return "instrumental focus classical"
-        case .social:                 return "party pop dance"
-        default:                      return "popular music"
-        }
-    }
+
 
     private func buildSpotifyHandoffURL(mood: EnhancedMood) -> URL {
         let q = (mood.seeds + [mood.title, "playlist"]).joined(separator: " ")

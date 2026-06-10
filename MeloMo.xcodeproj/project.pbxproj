@@ -220,7 +220,7 @@
 			packageReferences = (
 				3C923D542E74D96D00707AD6 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				3C204C552E7E51A300888042 /* XCRemoteSwiftPackageReference "YouTubePlayerKit" */,
-				5195693C328B9C46B7E8D949 /* XCRemoteSwiftPackageReference "FontAwesome.swift" */,
+				5195693C328B9C46B7E8D949 /* XCRemoteSwiftPackageReference "FontAwesome" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3C9E42062E6283C30052A727 /* Products */;
@@ -605,7 +605,7 @@
 				minimumVersion = 9.0.0;
 			};
 		};
-		5195693C328B9C46B7E8D949 /* XCRemoteSwiftPackageReference "FontAwesome.swift" */ = {
+		5195693C328B9C46B7E8D949 /* XCRemoteSwiftPackageReference "FontAwesome" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/thii/FontAwesome.swift";
 			requirement = {
@@ -622,7 +622,7 @@
 		};
 		C77C9D4F3588FFFA3BBBEA98 /* FontAwesome */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 5195693C328B9C46B7E8D949 /* XCRemoteSwiftPackageReference "FontAwesome.swift" */;
+			package = 5195693C328B9C46B7E8D949 /* XCRemoteSwiftPackageReference "FontAwesome" */;
 			productName = FontAwesome;
 		};
 /* End XCSwiftPackageProductDependency section */

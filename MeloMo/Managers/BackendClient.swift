@@ -12,7 +12,7 @@ final class BackendClient {
     #if DEBUG
     private let baseURL = URL(string: "http://localhost:8000")!
     #else
-    private let baseURL = URL(string: "https://melomo-backend.onrender.com")!
+    private let baseURL = URL(string: Bundle.main.object(forInfoDictionaryKey: "BackendURL") as? String ?? "")!
     #endif
 
     private let decoder: JSONDecoder = {
@@ -29,19 +29,41 @@ final class BackendClient {
 
     // MARK: - Mood Generate
 
-    func generatePlaylist(input: String, sourceOverride: String? = nil) async throws -> MoodGenerateResponse {
+    func generatePlaylist(input: String, sourceOverride: String? = nil, biometrics: BiometricData? = nil) async throws -> MoodGenerateResponse {
         var req = URLRequest(url: baseURL.appending(path: "/mood/generate"))
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.timeoutInterval = 15   // Render cold start can take ~3s; 15s is generous
 
-        req.httpBody = try encoder.encode(MoodGenerateRequest(input: input, sourceOverride: sourceOverride))
+        req.httpBody = try encoder.encode(MoodGenerateRequest(input: input, sourceOverride: sourceOverride, biometrics: biometrics))
 
         let (data, response) = try await URLSession.shared.data(for: req)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else {
             throw BackendError.serverError((response as? HTTPURLResponse)?.statusCode ?? 0)
         }
         return try decoder.decode(MoodGenerateResponse.self, from: data)
+    }
+    
+    // MARK: - Vibe Sync
+    
+    func publishVibe(mood: String, emoji: String) async {
+        var req = URLRequest(url: baseURL.appending(path: "/mood/publish"))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body = ["mood": mood, "emoji": emoji]
+        req.httpBody = try? JSONEncoder().encode(body)
+        
+        _ = try? await URLSession.shared.data(for: req)
+    }
+    
+    func getTrendingVibes() async -> [[String: String]] {
+        let req = URLRequest(url: baseURL.appending(path: "/mood/trending"))
+        guard let (data, _) = try? await URLSession.shared.data(for: req),
+              let list = try? JSONDecoder().decode([[String: String]].self, from: data) else {
+            return []
+        }
+        return list
     }
 
     // MARK: - Export
@@ -69,6 +91,7 @@ final class BackendClient {
 struct MoodGenerateRequest: Encodable {
     let input: String
     let sourceOverride: String?
+    let biometrics: BiometricData?
 }
 
 struct MoodGenerateResponse: Decodable {

@@ -50,6 +50,24 @@ struct NowPlayingView: View {
                         .padding(.top, 12)
                 }
 
+                // Download Button for Jamendo (The Offline Vault)
+                if musicController.playbackSource == .jamendo {
+                    Button(action: { musicController.downloadCurrentPlaylist() }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.down.circle.fill")
+                            Text("Vault this playlist")
+                                .font(.subheadline).fontWeight(.semibold)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .padding(.horizontal, 24)
+                    }
+                    .padding(.top, 8)
+                }
+
                 Button(action: { showExportSheet = true }) {
                     HStack(spacing: 8) {
                         Text(Icons.export)

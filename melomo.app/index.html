@@ -1,0 +1,2003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MeloMo — Feel the Music</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;1,300&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+<style>
+:root {
+  --bg-void: #050507;
+  --bg-deep: #09090f;
+  --bg-surface: #0f0f1a;
+  --bg-elevated: #141422;
+  --glass: rgba(255,255,255,0.04);
+  --glass-border: rgba(255,255,255,0.08);
+  --glass-hover: rgba(255,255,255,0.07);
+  --gold: #c9a96e;
+  --gold-light: #e8c98a;
+  --gold-dim: rgba(201,169,110,0.15);
+  --violet: #7c5cbf;
+  --violet-glow: rgba(124,92,191,0.3);
+  --rose: #bf5c7c;
+  --teal: #5cbfb4;
+  --text-primary: #f0ede8;
+  --text-secondary: rgba(240,237,232,0.55);
+  --text-muted: rgba(240,237,232,0.28);
+  --font-display: 'Cormorant Garamond', serif;
+  --font-ui: 'Syne', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; overflow-x: hidden; }
+
+body {
+  background: var(--bg-void);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ── CURSOR ── */
+.cursor {
+  width: 8px; height: 8px;
+  background: var(--gold);
+  border-radius: 50%;
+  position: fixed; top: 0; left: 0;
+  pointer-events: none;
+  z-index: 9999;
+  transition: transform 0.15s ease, width 0.2s ease, height 0.2s ease, background 0.2s ease;
+  mix-blend-mode: screen;
+}
+.cursor-ring {
+  width: 32px; height: 32px;
+  border: 1px solid rgba(201,169,110,0.4);
+  border-radius: 50%;
+  position: fixed; top: 0; left: 0;
+  pointer-events: none;
+  z-index: 9998;
+  transition: transform 0.35s cubic-bezier(0.23, 1, 0.32, 1), width 0.3s ease, height 0.3s ease, opacity 0.2s ease;
+}
+body:hover .cursor-ring { opacity: 1; }
+
+/* ── NOISE GRAIN ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+  opacity: 0.035;
+  pointer-events: none;
+  z-index: 9997;
+}
+
+/* ── AURORA BACKGROUND ── */
+.aurora {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+.aurora-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0;
+  animation: aurora-pulse 12s ease-in-out infinite;
+}
+.aurora-orb:nth-child(1) {
+  width: 700px; height: 700px;
+  background: radial-gradient(circle, rgba(124,92,191,0.18) 0%, transparent 70%);
+  top: -200px; left: -100px;
+  animation-delay: 0s;
+}
+.aurora-orb:nth-child(2) {
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(201,169,110,0.12) 0%, transparent 70%);
+  top: 30%; right: -150px;
+  animation-delay: 4s;
+}
+.aurora-orb:nth-child(3) {
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(92,191,180,0.1) 0%, transparent 70%);
+  bottom: -100px; left: 30%;
+  animation-delay: 8s;
+}
+.aurora-orb:nth-child(4) {
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, rgba(191,92,124,0.1) 0%, transparent 70%);
+  top: 60%; left: -80px;
+  animation-delay: 2s;
+}
+@keyframes aurora-pulse {
+  0%, 100% { opacity: 0; transform: scale(0.9) translate(0, 0); }
+  50% { opacity: 1; transform: scale(1.1) translate(20px, -20px); }
+}
+
+/* ── SCROLL PROGRESS ── */
+.scroll-bar {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--violet), var(--gold), var(--teal));
+  transform-origin: left;
+  transform: scaleX(0);
+  z-index: 9996;
+  transition: transform 0.05s linear;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0;
+  z-index: 1000;
+  padding: 24px 60px;
+  display: flex; align-items: center; justify-content: space-between;
+  transition: background 0.4s ease, padding 0.4s ease;
+}
+nav.scrolled {
+  background: rgba(5,5,7,0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--glass-border);
+  padding: 16px 60px;
+}
+.nav-logo {
+  display: flex; align-items: center; gap: 10px;
+  text-decoration: none;
+}
+.nav-logo-mark {
+  width: 36px; height: 36px;
+  position: relative;
+}
+.nav-logo-mark svg { width: 100%; height: 100%; }
+.nav-logo-text {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+.nav-logo-text span { color: var(--gold); }
+.nav-links {
+  display: flex; align-items: center; gap: 36px;
+  list-style: none;
+}
+.nav-links a {
+  text-decoration: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: color 0.2s ease;
+  position: relative;
+}
+.nav-links a::after {
+  content: '';
+  position: absolute; bottom: -4px; left: 0; right: 0;
+  height: 1px;
+  background: var(--gold);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+.nav-links a:hover { color: var(--text-primary); }
+.nav-links a:hover::after { transform: scaleX(1); }
+.nav-cta {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 22px;
+  background: var(--gold-dim);
+  border: 1px solid rgba(201,169,110,0.3);
+  border-radius: 40px;
+  text-decoration: none;
+  color: var(--gold-light);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+}
+.nav-cta svg { width: 14px; height: 14px; }
+.nav-cta:hover {
+  background: rgba(201,169,110,0.22);
+  border-color: rgba(201,169,110,0.5);
+  box-shadow: 0 0 24px rgba(201,169,110,0.15);
+}
+
+/* ── HERO ── */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center;
+  padding: 140px 40px 100px;
+  z-index: 1;
+  overflow: hidden;
+}
+.hero-bg-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+}
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 7px 18px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 40px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 36px;
+  animation: fadeUp 0.8s ease both;
+}
+.hero-eyebrow::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  animation: pulse-dot 2s ease infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201,169,110,0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(201,169,110,0); }
+}
+.hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(64px, 9vw, 128px);
+  font-weight: 300;
+  line-height: 0.92;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  animation: fadeUp 0.9s 0.1s ease both;
+}
+.hero-title em {
+  font-style: italic;
+  color: var(--gold);
+  display: block;
+}
+.hero-title .outline {
+  -webkit-text-stroke: 1px rgba(240,237,232,0.3);
+  color: transparent;
+}
+.hero-sub {
+  font-family: var(--font-display);
+  font-size: clamp(18px, 2.5vw, 26px);
+  font-weight: 300;
+  color: var(--text-secondary);
+  max-width: 560px;
+  margin: 24px auto 52px;
+  line-height: 1.5;
+  animation: fadeUp 1s 0.2s ease both;
+}
+.hero-actions {
+  display: flex; align-items: center; justify-content: center; gap: 16px;
+  flex-wrap: wrap;
+  animation: fadeUp 1s 0.3s ease both;
+}
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 16px 36px;
+  background: linear-gradient(135deg, var(--gold) 0%, #a07840 100%);
+  border: none;
+  border-radius: 50px;
+  color: #0a0805;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 32px rgba(201,169,110,0.25), 0 1px 0 rgba(255,255,255,0.2) inset;
+  position: relative;
+  overflow: hidden;
+}
+.btn-primary::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%);
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 48px rgba(201,169,110,0.4);
+}
+.btn-primary svg { width: 16px; height: 16px; }
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 16px 36px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 50px;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.btn-ghost:hover {
+  background: var(--glass-hover);
+  border-color: rgba(255,255,255,0.15);
+  color: var(--text-primary);
+}
+.hero-stats {
+  display: flex; align-items: center; justify-content: center; gap: 48px;
+  margin-top: 72px;
+  padding-top: 40px;
+  border-top: 1px solid var(--glass-border);
+  animation: fadeUp 1s 0.5s ease both;
+}
+.stat-item { text-align: center; }
+.stat-num {
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 300;
+  color: var(--gold);
+  display: block;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.stat-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.stat-divider {
+  width: 1px; height: 40px;
+  background: var(--glass-border);
+}
+
+/* ── HERO PHONE MOCKUP ── */
+.hero-visual {
+  position: relative;
+  margin-top: 80px;
+  animation: fadeUp 1s 0.4s ease both;
+  display: flex; justify-content: center;
+}
+.phone-mockup {
+  width: 280px;
+  background: var(--bg-surface);
+  border-radius: 40px;
+  border: 1px solid var(--glass-border);
+  padding: 16px;
+  position: relative;
+  box-shadow:
+    0 80px 160px rgba(0,0,0,0.8),
+    0 0 0 1px rgba(255,255,255,0.06) inset,
+    0 60px 80px rgba(124,92,191,0.1);
+  transform: perspective(1200px) rotateX(6deg) rotateY(-4deg);
+  transition: transform 0.6s ease;
+}
+.phone-mockup:hover {
+  transform: perspective(1200px) rotateX(2deg) rotateY(-2deg);
+}
+.phone-notch {
+  width: 80px; height: 24px;
+  background: var(--bg-void);
+  border-radius: 12px;
+  margin: 0 auto 16px;
+  position: relative;
+  z-index: 1;
+}
+.phone-screen {
+  background: linear-gradient(160deg, #0d0d1f 0%, #0a0a16 100%);
+  border-radius: 28px;
+  padding: 20px;
+  min-height: 460px;
+  overflow: hidden;
+  position: relative;
+}
+.phone-screen::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 200px;
+  background: radial-gradient(ellipse at 50% 0%, rgba(124,92,191,0.25) 0%, transparent 70%);
+}
+.ps-mood-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.ps-mood-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  background: rgba(124,92,191,0.2);
+  border: 1px solid rgba(124,92,191,0.3);
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #b39ddb;
+  margin-bottom: 20px;
+}
+.ps-now-playing {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 14px;
+  backdrop-filter: blur(12px);
+}
+.ps-album-art {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #7c5cbf 0%, #3a2a60 50%, #1a1a30 100%);
+  margin-bottom: 12px;
+  position: relative;
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+.ps-album-art::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 40% 40%, rgba(255,255,255,0.08) 0%, transparent 60%);
+}
+.vinyl-icon {
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, #0a0a16 0deg, #1a1a30 30deg, #0a0a16 60deg, #1a1a30 90deg, #0a0a16 120deg, #1a1a30 150deg, #0a0a16 180deg, #1a1a30 210deg, #0a0a16 240deg, #1a1a30 270deg, #0a0a16 300deg, #1a1a30 330deg, #0a0a16 360deg);
+  display: flex; align-items: center; justify-content: center;
+  animation: spin 8s linear infinite;
+  position: relative; z-index: 1;
+}
+.vinyl-icon::after {
+  content: '';
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #c9a96e 0%, #8a6a30 100%);
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.ps-track-info { display: flex; align-items: center; justify-content: space-between; }
+.ps-track-name { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+.ps-track-artist { font-size: 11px; color: var(--text-muted); }
+.ps-heart { color: var(--rose); font-size: 16px; }
+.ps-progress {
+  margin-top: 12px;
+  height: 2px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  position: relative;
+  overflow: visible;
+}
+.ps-progress-fill {
+  height: 100%;
+  width: 42%;
+  background: linear-gradient(90deg, var(--violet), var(--gold));
+  border-radius: 2px;
+  position: relative;
+}
+.ps-progress-fill::after {
+  content: '';
+  position: absolute; right: -4px; top: -3px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+.ps-controls {
+  display: flex; align-items: center; justify-content: space-around;
+  margin-top: 14px;
+}
+.ps-ctrl-btn {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+.ps-ctrl-btn.play {
+  width: 44px; height: 44px;
+  background: linear-gradient(135deg, var(--gold), #8a6a30);
+  color: #0a0805;
+}
+.ps-playlist-title {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+.ps-track-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.ps-track-num {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  width: 14px;
+  text-align: center;
+}
+.ps-track-row.active .ps-track-num { color: var(--gold); }
+.ps-mini-info { flex: 1; }
+.ps-mini-name { font-size: 12px; color: var(--text-primary); margin-bottom: 2px; }
+.ps-mini-artist { font-size: 10px; color: var(--text-muted); }
+.ps-mini-dur { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+.ps-waveform {
+  display: flex; align-items: center; gap: 2px;
+  height: 16px;
+}
+.ps-wave-bar {
+  width: 2px;
+  border-radius: 2px;
+  background: var(--gold);
+  animation: wave-bar 0.8s ease-in-out infinite alternate;
+}
+.ps-wave-bar:nth-child(1) { height: 4px; animation-delay: 0s; }
+.ps-wave-bar:nth-child(2) { height: 12px; animation-delay: 0.1s; }
+.ps-wave-bar:nth-child(3) { height: 8px; animation-delay: 0.2s; }
+.ps-wave-bar:nth-child(4) { height: 14px; animation-delay: 0.05s; }
+.ps-wave-bar:nth-child(5) { height: 6px; animation-delay: 0.15s; }
+@keyframes wave-bar {
+  from { transform: scaleY(0.4); }
+  to { transform: scaleY(1); }
+}
+
+/* floating badges */
+.float-badge {
+  position: absolute;
+  background: var(--bg-elevated);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.float-badge-1 {
+  top: 80px; right: -80px;
+  animation: float1 6s ease-in-out infinite;
+}
+.float-badge-2 {
+  bottom: 160px; left: -90px;
+  animation: float2 7s ease-in-out infinite;
+}
+@keyframes float1 {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+@keyframes float2 {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(12px); }
+}
+.badge-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+
+/* ── SECTION SHARED ── */
+section { position: relative; z-index: 1; }
+.section-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 20px;
+}
+.section-eyebrow::before {
+  content: '';
+  width: 24px; height: 1px;
+  background: var(--gold);
+}
+.section-title {
+  font-family: var(--font-display);
+  font-size: clamp(40px, 5vw, 64px);
+  font-weight: 300;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+.section-title em {
+  font-style: italic;
+  color: var(--gold);
+}
+.section-body {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 300;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+/* ── HOW IT WORKS ── */
+.how {
+  padding: 120px 60px;
+  max-width: 1300px;
+  margin: 0 auto;
+}
+.how-header {
+  text-align: center;
+  margin-bottom: 80px;
+}
+.how-steps {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 2px;
+  position: relative;
+}
+.step-connector {
+  position: absolute;
+  top: 64px;
+  left: calc(33.33% - 1px);
+  right: calc(33.33% - 1px);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--glass-border), var(--glass-border), transparent);
+}
+.step-card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  padding: 40px 36px;
+  transition: all 0.4s ease;
+  position: relative;
+  overflow: hidden;
+}
+.step-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.step-card:hover {
+  background: var(--glass-hover);
+  border-color: rgba(255,255,255,0.12);
+  transform: translateY(-6px);
+}
+.step-card:hover::before { opacity: 1; }
+.step-num {
+  font-family: var(--font-display);
+  font-size: 72px;
+  font-weight: 300;
+  color: rgba(201,169,110,0.08);
+  line-height: 1;
+  margin-bottom: 8px;
+  letter-spacing: -0.04em;
+}
+.step-icon {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  background: var(--gold-dim);
+  border: 1px solid rgba(201,169,110,0.2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  margin-bottom: 24px;
+}
+.step-title {
+  font-family: var(--font-ui);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  letter-spacing: -0.01em;
+}
+.step-desc {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 300;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+/* ── MOOD SHOWCASE ── */
+.moods {
+  padding: 80px 60px 120px;
+  max-width: 1300px;
+  margin: 0 auto;
+}
+.moods-header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  margin-bottom: 56px;
+}
+.moods-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  grid-template-rows: auto auto;
+  gap: 16px;
+}
+.mood-card {
+  border-radius: 20px;
+  padding: 28px 24px;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  min-height: 200px;
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.mood-card:hover {
+  transform: translateY(-6px) scale(1.02);
+}
+.mood-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: inherit;
+  filter: brightness(0.7);
+  transition: filter 0.3s ease;
+}
+.mood-card:hover::before { filter: brightness(0.85); }
+.mood-card > * { position: relative; z-index: 1; }
+.mood-card.large { grid-column: span 2; grid-row: span 2; min-height: 420px; }
+.mood-card.wide { grid-column: span 2; }
+
+.mood-melancholy { background: linear-gradient(160deg, #1a1a3a 0%, #0d0d1f 60%, #0a0a1a 100%); box-shadow: 0 20px 60px rgba(26,26,58,0.5); }
+.mood-euphoric { background: linear-gradient(160deg, #3d1f6b 0%, #6b3d1f 100%); box-shadow: 0 20px 60px rgba(61,31,107,0.4); }
+.mood-serene { background: linear-gradient(160deg, #0d2a2a 0%, #0a1f1f 100%); box-shadow: 0 20px 60px rgba(13,42,42,0.5); }
+.mood-intense { background: linear-gradient(160deg, #3a0d0d 0%, #1f0a0a 100%); box-shadow: 0 20px 60px rgba(58,13,13,0.5); }
+.mood-romantic { background: linear-gradient(160deg, #3a1f2a 0%, #1f0d16 100%); box-shadow: 0 20px 60px rgba(58,31,42,0.4); }
+.mood-focus { background: linear-gradient(160deg, #0d1a3a 0%, #0a1225 100%); box-shadow: 0 20px 60px rgba(13,26,58,0.5); }
+
+.mood-emoji {
+  font-size: 36px;
+  margin-bottom: 12px;
+  display: block;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+}
+.mood-card.large .mood-emoji { font-size: 56px; }
+.mood-name {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.mood-card.large .mood-name { font-size: 32px; }
+.mood-count {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.4);
+}
+.mood-tag {
+  position: absolute;
+  top: 20px; right: 20px;
+  padding: 5px 12px;
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.6);
+}
+
+/* ── FEATURES ── */
+.features {
+  padding: 120px 60px;
+  background: var(--bg-deep);
+  border-top: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--glass-border);
+}
+.features-inner {
+  max-width: 1300px;
+  margin: 0 auto;
+}
+.features-header { text-align: center; margin-bottom: 80px; }
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.feature-card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  padding: 40px;
+  transition: all 0.4s ease;
+  position: relative;
+  overflow: hidden;
+}
+.feature-card::after {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  transform: scaleX(0);
+  transition: transform 0.4s ease;
+}
+.feature-card:hover {
+  background: var(--glass-hover);
+  transform: translateY(-4px);
+  border-color: rgba(255,255,255,0.1);
+}
+.feature-card:hover::after { transform: scaleX(1); }
+.feature-icon {
+  width: 56px; height: 56px;
+  border-radius: 16px;
+  margin-bottom: 28px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  position: relative;
+}
+.feature-icon.violet { background: rgba(124,92,191,0.15); border: 1px solid rgba(124,92,191,0.25); }
+.feature-icon.gold { background: var(--gold-dim); border: 1px solid rgba(201,169,110,0.2); }
+.feature-icon.teal { background: rgba(92,191,180,0.12); border: 1px solid rgba(92,191,180,0.2); }
+.feature-icon.rose { background: rgba(191,92,124,0.12); border: 1px solid rgba(191,92,124,0.2); }
+.feature-icon.blue { background: rgba(92,124,191,0.12); border: 1px solid rgba(92,124,191,0.2); }
+.feature-icon.amber { background: rgba(191,140,92,0.12); border: 1px solid rgba(191,140,92,0.2); }
+.feature-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  letter-spacing: -0.01em;
+}
+.feature-desc {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 300;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+.feature-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 20px;
+  padding: 5px 12px;
+  background: var(--gold-dim);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+/* ── TESTIMONIALS ── */
+.testimonials {
+  padding: 120px 60px;
+  max-width: 1300px;
+  margin: 0 auto;
+}
+.testimonials-header { text-align: center; margin-bottom: 72px; }
+.testi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 24px;
+}
+.testi-card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  padding: 36px;
+  transition: transform 0.3s ease;
+}
+.testi-card:hover { transform: translateY(-4px); }
+.testi-stars {
+  display: flex; gap: 4px;
+  margin-bottom: 20px;
+}
+.star { color: var(--gold); font-size: 14px; }
+.testi-quote {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 300;
+  font-style: italic;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  margin-bottom: 28px;
+}
+.testi-quote::before { content: '\201C'; }
+.testi-quote::after { content: '\201D'; }
+.testi-author {
+  display: flex; align-items: center; gap: 12px;
+}
+.testi-avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0a0805;
+  flex-shrink: 0;
+}
+.av-1 { background: linear-gradient(135deg, var(--gold), #a07840); }
+.av-2 { background: linear-gradient(135deg, var(--violet), #3d1a6b); color: white; }
+.av-3 { background: linear-gradient(135deg, var(--teal), #2a6b66); color: white; }
+.testi-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.testi-role { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+/* ── PRICING ── */
+.pricing {
+  padding: 120px 60px;
+  background: var(--bg-deep);
+  border-top: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--glass-border);
+}
+.pricing-inner { max-width: 1100px; margin: 0 auto; }
+.pricing-header { text-align: center; margin-bottom: 72px; }
+.pricing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 24px;
+}
+.price-card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 28px;
+  padding: 40px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s ease;
+}
+.price-card:hover { transform: translateY(-6px); }
+.price-card.featured {
+  background: linear-gradient(160deg, rgba(201,169,110,0.06) 0%, rgba(124,92,191,0.06) 100%);
+  border-color: rgba(201,169,110,0.25);
+  box-shadow: 0 0 80px rgba(201,169,110,0.06), 0 40px 80px rgba(0,0,0,0.4);
+}
+.featured-badge {
+  position: absolute; top: -1px; left: 50%; transform: translateX(-50%);
+  padding: 6px 20px;
+  background: linear-gradient(90deg, var(--violet), var(--gold));
+  border-radius: 0 0 14px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: white;
+}
+.plan-name {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+.plan-price {
+  display: flex; align-items: baseline; gap: 4px;
+  margin-bottom: 6px;
+}
+.price-amount {
+  font-family: var(--font-display);
+  font-size: 54px;
+  font-weight: 300;
+  color: var(--text-primary);
+  line-height: 1;
+}
+.price-currency {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 300;
+  color: var(--text-secondary);
+  align-self: flex-start;
+  margin-top: 10px;
+}
+.price-period {
+  font-size: 13px;
+  color: var(--text-muted);
+  align-self: flex-end;
+  margin-bottom: 8px;
+}
+.plan-tagline {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--text-secondary);
+  margin-bottom: 36px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--glass-border);
+}
+.plan-features { list-style: none; margin-bottom: 36px; }
+.plan-feature {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 10px 0;
+  font-size: 15px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.plan-feature:last-child { border-bottom: none; }
+.plan-feature-check { color: var(--gold); font-size: 14px; margin-top: 1px; flex-shrink: 0; }
+.plan-feature-check.dim { color: var(--text-muted); }
+.plan-cta {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  border-radius: 50px;
+  text-align: center;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  transition: all 0.3s ease;
+}
+.plan-cta.ghost {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+}
+.plan-cta.ghost:hover {
+  background: var(--glass-hover);
+  border-color: rgba(255,255,255,0.15);
+  color: var(--text-primary);
+}
+.plan-cta.primary {
+  background: linear-gradient(135deg, var(--gold), #a07840);
+  color: #0a0805;
+  box-shadow: 0 4px 24px rgba(201,169,110,0.25);
+}
+.plan-cta.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 36px rgba(201,169,110,0.35);
+}
+
+/* ── APP DOWNLOAD ── */
+.download {
+  padding: 120px 60px;
+  max-width: 1300px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+}
+.download-content {}
+.download-title {
+  font-family: var(--font-display);
+  font-size: clamp(44px, 5vw, 68px);
+  font-weight: 300;
+  line-height: 1.05;
+  margin-bottom: 20px;
+}
+.download-desc {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 300;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: 40px;
+}
+.store-badges {
+  display: flex; gap: 16px; flex-wrap: wrap;
+}
+.store-badge {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 24px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+}
+.store-badge:hover {
+  background: var(--glass-hover);
+  border-color: rgba(255,255,255,0.14);
+  transform: translateY(-2px);
+}
+.store-badge-icon { font-size: 28px; }
+.store-badge-text { display: flex; flex-direction: column; }
+.store-badge-sub { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+.store-badge-name { font-size: 16px; font-weight: 600; line-height: 1.2; }
+.download-visual {
+  display: flex; justify-content: flex-end; align-items: center;
+  position: relative;
+}
+.dl-phone-wrap {
+  position: relative;
+}
+.dl-phone-bg {
+  position: absolute;
+  inset: -60px;
+  background: radial-gradient(ellipse, rgba(124,92,191,0.15) 0%, transparent 70%);
+  filter: blur(40px);
+}
+.rating-badge {
+  position: absolute; top: -24px; left: -40px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 14px 18px;
+  display: flex; align-items: center; gap: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  animation: float1 5s ease-in-out infinite;
+}
+.rating-num {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 300;
+  color: var(--gold);
+}
+.rating-stars { display: flex; flex-direction: column; gap: 4px; }
+.rating-stars .stars { display: flex; gap: 2px; }
+.rating-count { font-size: 11px; color: var(--text-muted); }
+
+/* ── FOOTER ── */
+footer {
+  border-top: 1px solid var(--glass-border);
+  padding: 80px 60px 40px;
+  position: relative; z-index: 1;
+}
+.footer-inner { max-width: 1300px; margin: 0 auto; }
+.footer-top {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 60px;
+  padding-bottom: 60px;
+  border-bottom: 1px solid var(--glass-border);
+  margin-bottom: 40px;
+}
+.footer-brand-name {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 300;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+.footer-brand-name span { color: var(--gold); }
+.footer-tagline {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--text-muted);
+  margin-bottom: 28px;
+  line-height: 1.6;
+}
+.social-links { display: flex; gap: 10px; }
+.social-link {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  display: flex; align-items: center; justify-content: center;
+  text-decoration: none;
+  color: var(--text-secondary);
+  font-size: 16px;
+  transition: all 0.2s ease;
+}
+.social-link:hover {
+  background: var(--glass-hover);
+  color: var(--text-primary);
+  border-color: rgba(255,255,255,0.15);
+}
+.footer-col-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+.footer-links { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.footer-links a {
+  text-decoration: none;
+  font-size: 14px;
+  color: var(--text-secondary);
+  transition: color 0.2s ease;
+}
+.footer-links a:hover { color: var(--text-primary); }
+.footer-bottom {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.footer-bottom a { color: var(--text-muted); text-decoration: none; }
+.footer-bottom a:hover { color: var(--text-secondary); }
+
+/* ── ANIMATE ON SCROLL ── */
+.reveal {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+.reveal-delay-4 { transition-delay: 0.4s; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── MOBILE HAMBURGER ── */
+.nav-hamburger {
+  display: none;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  width: 40px; height: 40px;
+  align-items: center; justify-content: center;
+  color: var(--text-primary);
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.nav-hamburger:hover { background: var(--glass-hover); }
+
+/* ── MOBILE MENU ── */
+.mobile-menu {
+  position: fixed;
+  inset: 0;
+  background: rgba(5,5,7,0.97);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  padding: 32px 28px 40px;
+  transform: translateX(100%);
+  transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.mobile-menu.open { transform: translateX(0); }
+.mobile-menu-close {
+  align-self: flex-end;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-primary);
+  font-size: 18px;
+  cursor: pointer;
+  margin-bottom: 40px;
+  transition: background 0.2s ease;
+}
+.mobile-menu-close:hover { background: var(--glass-hover); }
+.mobile-menu-logo {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 48px;
+}
+.mobile-menu-links {
+  list-style: none;
+  display: flex; flex-direction: column;
+  gap: 0;
+  flex: 1;
+}
+.mobile-menu-links li {
+  border-bottom: 1px solid var(--glass-border);
+}
+.mobile-menu-links a {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 300;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+.mobile-menu-links a:hover { color: var(--text-primary); }
+.mobile-menu-links a::after {
+  content: '\f061';
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  font-size: 14px;
+  color: var(--gold);
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.mobile-menu-links a:hover::after {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 1100px) {
+  .how-steps, .features-grid, .testi-grid, .pricing-grid { grid-template-columns: 1fr 1fr; }
+  .moods-grid { grid-template-columns: repeat(3, 1fr); }
+  .mood-card.large { grid-column: span 2; }
+  .download { grid-template-columns: 1fr; gap: 60px; }
+  .download-visual { justify-content: center; }
+  .footer-top { grid-template-columns: 1fr 1fr; gap: 40px; }
+}
+@media (max-width: 768px) {
+  nav { padding: 20px 24px; }
+  nav.scrolled { padding: 14px 24px; }
+  .nav-links { display: none; }
+  .nav-cta { display: none; }
+  .nav-hamburger { display: flex; }
+  .how, .moods, .features, .testimonials, .pricing, .download, footer { padding-left: 24px; padding-right: 24px; }
+  .how-steps, .features-grid, .testi-grid, .pricing-grid { grid-template-columns: 1fr; }
+  .moods-grid { grid-template-columns: repeat(2, 1fr); }
+  .mood-card.large { grid-column: span 2; }
+  .moods-header { flex-direction: column; align-items: flex-start; gap: 20px; }
+  .hero-stats { gap: 24px; }
+  .float-badge { display: none; }
+  .footer-top { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- CURSOR -->
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- SCROLL PROGRESS -->
+<div class="scroll-bar" id="scrollBar"></div>
+
+<!-- AURORA BG -->
+<div class="aurora">
+  <div class="aurora-orb"></div>
+  <div class="aurora-orb"></div>
+  <div class="aurora-orb"></div>
+  <div class="aurora-orb"></div>
+</div>
+
+<!-- NAV -->
+<nav id="mainNav">
+  <a href="https://melomo.app" class="nav-logo">
+    <div class="nav-logo-mark">
+      <img src="images/meloicon.png" alt="MeloMo" style="width:36px;height:36px;border-radius:8px;object-fit:cover;">
+    </div>
+    <span class="nav-logo-text">Melo<span>Mo</span></span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#how">How It Works</a></li>
+    <li><a href="#moods">Moods</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+  </ul>
+  <a href="https://apps.apple.com/us/app/melomo/id6751825937" class="nav-cta" target="_blank" rel="noopener">
+    <i class="fa-brands fa-apple"></i>
+    Download App
+  </a>
+  <button class="nav-hamburger" id="navHamburger" aria-label="Open menu">
+    <i class="fa-solid fa-bars"></i>
+  </button>
+</nav>
+
+<!-- MOBILE MENU -->
+<div class="mobile-menu" id="mobileMenu">
+  <button class="mobile-menu-close" id="mobileMenuClose" aria-label="Close menu">
+    <i class="fa-solid fa-xmark"></i>
+  </button>
+  <div class="mobile-menu-logo">
+    <img src="images/meloicon.png" alt="MeloMo" style="width:40px;height:40px;border-radius:10px;">
+    <span style="font-family:var(--font-display);font-size:24px;font-weight:300;">Melo<span style="color:var(--gold);">Mo</span></span>
+  </div>
+  <ul class="mobile-menu-links">
+    <li><a href="#how">How It Works</a></li>
+    <li><a href="#moods">Moods</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+  </ul>
+  <a href="https://apps.apple.com/us/app/melomo/id6751825937" target="_blank" rel="noopener" class="btn-primary" style="width:100%;justify-content:center;margin-top:24px;">
+    <i class="fa-brands fa-apple" style="font-size:18px;"></i> Download Free
+  </a>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg-grid"></div>
+  <div style="position:relative;z-index:1;width:100%;max-width:1100px;margin:0 auto;">
+    <div style="display:flex;flex-direction:column;align-items:center;">
+      <div class="hero-eyebrow"><i class="fa-solid fa-wand-magic-sparkles" style="font-size:10px;"></i> AI Mood-Based Playlist Generator</div>
+      <h1 class="hero-title">
+        Your Music,
+        <em>Your Mood.</em>
+        <span class="outline">Perfectly Matched.</span>
+      </h1>
+      <p class="hero-sub">MeloMo reads how you feel and builds the perfect playlist in seconds — from melancholy late nights to euphoric summer drives.</p>
+      <div class="hero-actions">
+        <a href="https://apps.apple.com/us/app/melomo/id6751825937" target="_blank" rel="noopener" class="btn-primary">
+          <i class="fa-brands fa-apple" style="font-size:18px;"></i>
+          App Store — Free
+        </a>
+        <a href="#how" class="btn-ghost">
+          See How It Works
+          <i class="fa-solid fa-arrow-up-right" style="font-size:13px;"></i>
+        </a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat-item">
+          <span class="stat-num">2.4M+</span>
+          <span class="stat-label">Active Listeners</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <span class="stat-num">48</span>
+          <span class="stat-label">Distinct Moods</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <span class="stat-num">4.9<i class="fa-solid fa-star" style="font-size:0.6em;vertical-align:middle;margin-left:2px;"></i></span>
+          <span class="stat-label">App Store Rating</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <span class="stat-num">80M+</span>
+          <span class="stat-label">Songs Curated</span>
+        </div>
+      </div>
+
+      <!-- PHONE -->
+      <div class="hero-visual">
+        <div style="position:relative;">
+          <div class="phone-mockup">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="ps-mood-label">Current Mood</div>
+              <div class="ps-mood-tag"><i class="fa-solid fa-moon" style="font-size:11px;"></i> Melancholic</div>
+              <div class="ps-now-playing">
+                <div class="ps-album-art">
+                  <div class="vinyl-icon"></div>
+                </div>
+                <div class="ps-track-info">
+                  <div>
+                    <div class="ps-track-name">Midnight Echoes</div>
+                    <div class="ps-track-artist">Aurora Nightfall</div>
+                  </div>
+                  <div class="ps-heart"><i class="fa-solid fa-heart" style="color:var(--rose);font-size:15px;"></i></div>
+                </div>
+                <div class="ps-progress">
+                  <div class="ps-progress-fill"></div>
+                </div>
+                <div class="ps-controls">
+                  <div class="ps-ctrl-btn"><i class="fa-solid fa-backward-step"></i></div>
+                  <div class="ps-ctrl-btn"><i class="fa-solid fa-backward"></i></div>
+                  <div class="ps-ctrl-btn play"><i class="fa-solid fa-play"></i></div>
+                  <div class="ps-ctrl-btn"><i class="fa-solid fa-forward"></i></div>
+                  <div class="ps-ctrl-btn"><i class="fa-solid fa-forward-step"></i></div>
+                </div>
+              </div>
+              <div class="ps-playlist-title">Up Next — 24 tracks</div>
+              <div class="ps-track-row active">
+                <div class="ps-track-num">
+                  <div class="ps-waveform">
+                    <div class="ps-wave-bar"></div>
+                    <div class="ps-wave-bar"></div>
+                    <div class="ps-wave-bar"></div>
+                    <div class="ps-wave-bar"></div>
+                    <div class="ps-wave-bar"></div>
+                  </div>
+                </div>
+                <div class="ps-mini-info">
+                  <div class="ps-mini-name">Midnight Echoes</div>
+                  <div class="ps-mini-artist">Aurora Nightfall</div>
+                </div>
+                <div class="ps-mini-dur">3:42</div>
+              </div>
+              <div class="ps-track-row">
+                <div class="ps-track-num">2</div>
+                <div class="ps-mini-info">
+                  <div class="ps-mini-name">Glass Hearts</div>
+                  <div class="ps-mini-artist">Velvet Shore</div>
+                </div>
+                <div class="ps-mini-dur">4:18</div>
+              </div>
+              <div class="ps-track-row">
+                <div class="ps-track-num">3</div>
+                <div class="ps-mini-info">
+                  <div class="ps-mini-name">Empty Rooms</div>
+                  <div class="ps-mini-artist">Soleil</div>
+                </div>
+                <div class="ps-mini-dur">3:55</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="float-badge float-badge-1">
+            <div class="badge-icon" style="background:rgba(124,92,191,0.2);">
+              <i class="fa-solid fa-brain" style="color:#b39ddb;font-size:16px;"></i>
+            </div>
+            <div>
+              <div style="font-size:12px;font-weight:600;color:var(--text-primary);">AI Matched</div>
+              <div style="font-size:10px;color:var(--text-muted);">98.3% mood accuracy</div>
+            </div>
+          </div>
+
+          <div class="float-badge float-badge-2">
+            <div class="badge-icon" style="background:rgba(201,169,110,0.15);">
+              <i class="fa-solid fa-music" style="color:var(--gold);font-size:16px;"></i>
+            </div>
+            <div>
+              <div style="font-size:12px;font-weight:600;color:var(--text-primary);">Playlist Ready</div>
+              <div style="font-size:10px;color:var(--text-muted);">Generated in 1.2s</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<div id="how">
+  <div class="how">
+    <div class="how-header reveal">
+      <div class="section-eyebrow">The Process</div>
+      <h2 class="section-title">Three steps to <em>sonic bliss</em></h2>
+    </div>
+    <div class="how-steps">
+      <div class="step-card reveal reveal-delay-1">
+        <div class="step-num">01</div>
+        <div class="step-icon"><i class="fa-solid fa-masks-theater" style="color:var(--gold);"></i></div>
+        <div class="step-title">Tell us how you feel</div>
+        <p class="step-desc">Choose from 48 nuanced moods, write a sentence, or let MeloMo read your listening patterns. No mood is too complex.</p>
+      </div>
+      <div class="step-card reveal reveal-delay-2">
+        <div class="step-num">02</div>
+        <div class="step-icon"><i class="fa-solid fa-dna" style="color:var(--gold);"></i></div>
+        <div class="step-title">AI curates your sound</div>
+        <p class="step-desc">Our proprietary mood-matching engine analyzes tempo, key, energy, valence, and 200+ acoustic signals to find your perfect match.</p>
+      </div>
+      <div class="step-card reveal reveal-delay-3">
+        <div class="step-num">03</div>
+        <div class="step-icon"><i class="fa-solid fa-music" style="color:var(--gold);"></i></div>
+        <div class="step-title">Press play. Feel everything.</div>
+        <p class="step-desc">Receive a deeply personal playlist in under two seconds. It learns from your skips, likes, and listening time to get sharper every day.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MOOD SHOWCASE -->
+<div id="moods">
+  <div class="moods">
+    <div class="moods-header reveal">
+      <div>
+        <div class="section-eyebrow">Mood Library</div>
+        <h2 class="section-title">48 moods,<br><em>infinite journeys</em></h2>
+      </div>
+      <p class="section-body" style="max-width:320px;">Every human emotion deserves its own soundtrack. We curated every shade of feeling.</p>
+    </div>
+    <div class="moods-grid reveal">
+      <div class="mood-card mood-melancholy large">
+        <span class="mood-tag">Most Loved</span>
+        <span class="mood-emoji"><i class="fa-solid fa-moon"></i></span>
+        <div class="mood-name">Melancholy</div>
+        <div class="mood-count">1.2M playlists</div>
+      </div>
+      <div class="mood-card mood-euphoric">
+        <span class="mood-emoji"><i class="fa-solid fa-star"></i></span>
+        <div class="mood-name">Euphoric</div>
+        <div class="mood-count">840K playlists</div>
+      </div>
+      <div class="mood-card mood-serene">
+        <span class="mood-emoji"><i class="fa-solid fa-water"></i></span>
+        <div class="mood-name">Serene</div>
+        <div class="mood-count">620K playlists</div>
+      </div>
+      <div class="mood-card mood-intense wide">
+        <span class="mood-emoji"><i class="fa-solid fa-bolt"></i></span>
+        <div class="mood-name">Intense</div>
+        <div class="mood-count">510K playlists</div>
+      </div>
+      <div class="mood-card mood-romantic">
+        <span class="mood-emoji"><i class="fa-solid fa-heart"></i></span>
+        <div class="mood-name">Romantic</div>
+        <div class="mood-count">780K playlists</div>
+      </div>
+      <div class="mood-card mood-focus">
+        <span class="mood-emoji"><i class="fa-solid fa-crosshairs"></i></span>
+        <div class="mood-name">Deep Focus</div>
+        <div class="mood-count">430K playlists</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section id="features" class="features">
+  <div class="features-inner">
+    <div class="features-header reveal">
+      <div class="section-eyebrow">Everything You Need</div>
+      <h2 class="section-title">Built for how <em>music actually works</em></h2>
+      <p class="section-body" style="max-width:580px;margin:16px auto 0;">Every feature is engineered around one truth: the right song at the right moment can change everything.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card reveal reveal-delay-1">
+        <div class="feature-icon violet"><i class="fa-solid fa-brain" style="color:#b39ddb;"></i></div>
+        <div class="feature-title">Emotion AI Engine</div>
+        <p class="feature-desc">Trained on 300M listening sessions, our model understands the nuance between longing and grief, between calm and detachment.</p>
+        <div class="feature-tag"><i class="fa-solid fa-lock" style="font-size:10px;"></i> Proprietary</div>
+      </div>
+      <div class="feature-card reveal reveal-delay-2">
+        <div class="feature-icon gold"><i class="fa-solid fa-bolt-lightning" style="color:var(--gold);"></i></div>
+        <div class="feature-title">Instant Generation</div>
+        <p class="feature-desc">A full 25-track playlist appears in under 2 seconds. No waiting, no loading screens. Your mood won't wait.</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-3">
+        <div class="feature-icon teal"><i class="fa-solid fa-palette" style="color:var(--teal);"></i></div>
+        <div class="feature-title">Mood Blending</div>
+        <p class="feature-desc">Real feelings don't fit one box. Blend up to three moods with custom intensity sliders for complex emotional states.</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-1">
+        <div class="feature-icon rose"><i class="fa-solid fa-chart-line" style="color:var(--rose);"></i></div>
+        <div class="feature-title">Adaptive Learning</div>
+        <p class="feature-desc">Every skip, replay, and heart improves your personal model. After 7 days, MeloMo knows your taste better than you do.</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-2">
+        <div class="feature-icon blue"><i class="fa-solid fa-link" style="color:#7c9cbf;"></i></div>
+        <div class="feature-title">Cross-Platform Sync</div>
+        <p class="feature-desc">Export playlists to Spotify, Apple Music, and YouTube Music with one tap. Powered by your existing library.</p>
+        <div class="feature-tag">Spotify · Apple Music · YouTube</div>
+      </div>
+      <div class="feature-card reveal reveal-delay-3">
+        <div class="feature-icon amber"><i class="fa-solid fa-globe" style="color:#bf9c5c;"></i></div>
+        <div class="feature-title">Global Music DNA</div>
+        <p class="feature-desc">80M+ tracks spanning every genre and culture. Jazz from Tokyo, ambient from Iceland, soul from Lagos — all indexed by feel.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="testimonials">
+  <div class="testimonials-header reveal">
+    <div class="section-eyebrow">Listener Stories</div>
+    <h2 class="section-title">They felt it too</h2>
+  </div>
+  <div class="testi-grid">
+    <div class="testi-card reveal reveal-delay-1">
+      <div class="testi-stars">
+        <i class="fa-solid fa-star star"></i><i class="fa-solid fa-star star"></i><i class="fa-solid fa-star star"></i><i class="fa-solid fa-star star"></i><i class="fa-solid fa-star star"></i>
+      </div>
+      <p class="testi-quote">I opened MeloMo after a difficult breakup, selected 'Heartbreak' and 'Nostalgia,' and it played exactly the music I needed to cry and then heal. It's uncanny how accurate it is.</p>
+      <div class="testi-author">
+        <div class="testi-avatar av-1">S</div>
+        <div>
+          <div class="testi-name">Sofia Reyes</div>
+          <div class="testi-role">Graphic Designer, Mexico City</div>
+        </div>
+      </div>
+    </div>
+    <div class="testi-card reveal reveal-delay-2">
+      <div class="testi-stars">
+        <i class="fa-solid fa-star star"></i><i class="fa-solid fa-star star"></i><i class="fa-solid fa-star star"></i><i class="fa-solid fa-star star"></i><i class="fa-solid fa-star star"></i>
+      </div>
+      <p class="testi-quote">I use Deep Focus mode every morning. Within a week of daily use, it stopped suggesting anything I'd skip. It's like it memorized the shape of my concentration.</p>
+      <div class="testi-author">
+        <div class="testi-avatar av-2">J</div>
+        <div>
+          <div class="testi-name">James Okafor</div>
+          <div class="testi-role">Software Engineer, London</div>
+        </div>
+      </div>
+    </div>
+    <div class="testi-card reveal reveal-delay-3">
+      <div class="testi-stars">
+        <i class="fa-solid fa-star star"></i><i class="fa-solid fa-star star"></i><i class="fa-solid fa-star star"></i><i class="fa-solid fa-star star"></i><i class="fa-solid fa-star star"></i>
+      </div>
+      <p class="testi-quote">Every Spotify recommendation felt algorithmic. MeloMo feels like a friend who actually listens. The mood blending feature discovered music I never knew I needed.</p>
+      <div class="testi-author">
+        <div class="testi-avatar av-3">Y</div>
+        <div>
+          <div class="testi-name">Yuki Tanaka</div>
+          <div class="testi-role">Musician, Tokyo</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing" class="pricing">
+  <div class="pricing-inner">
+    <div class="pricing-header reveal">
+      <div class="section-eyebrow">Simple Pricing</div>
+      <h2 class="section-title">Begin for free,<br><em>stay forever</em></h2>
+    </div>
+    <div class="pricing-grid">
+      <div class="price-card reveal reveal-delay-1">
+        <div class="plan-name">Listener</div>
+        <div class="plan-price">
+          <span class="price-currency">$</span>
+          <span class="price-amount">0</span>
+          <span class="price-period">/ mo</span>
+        </div>
+        <p class="plan-tagline">For those just discovering their sound</p>
+        <ul class="plan-features">
+          <li class="plan-feature"><span class="plan-feature-check"><i class="fa-solid fa-check"></i></span>10 playlists per month</li>
+          <li class="plan-feature"><span class="plan-feature-check"><i class="fa-solid fa-check"></i></span>12 core moods</li>
+          <li class="plan-feature"><span class="plan-feature-check"><i class="fa-solid fa-check"></i></span>Spotify export</li>
+          <li class="plan-feature"><span class="plan-feature-check dim"><i class="fa-solid fa-xmark"></i></span><span style="opacity:0.4;">Mood blending</span></li>
+          <li class="plan-feature"><span class="plan-feature-check dim"><i class="fa-solid fa-xmark"></i></span><span style="opacity:0.4;">Adaptive learning</span></li>
+        </ul>
+        <a href="https://apps.apple.com/us/app/melomo/id6751825937" target="_blank" rel="noopener" class="plan-cta ghost"><i class="fa-brands fa-apple"></i> Start Free</a>
+      </div>
+      <div class="price-card featured reveal reveal-delay-2">
+        <div class="featured-badge">Most Popular</div>
+        <div class="plan-name">Mood+</div>
+        <div class="plan-price">
+          <span class="price-currency">$</span>
+          <span class="price-amount">7</span>
+          <span class="price-period">/ mo</span>
+        </div>
+        <p class="plan-tagline">For listeners who feel deeply</p>
+        <ul class="plan-features">
+          <li class="plan-feature"><span class="plan-feature-check"><i class="fa-solid fa-check"></i></span>Unlimited playlists</li>
+          <li class="plan-feature"><span class="plan-feature-check"><i class="fa-solid fa-check"></i></span>All 48 moods</li>
+          <li class="plan-feature"><span class="plan-feature-check"><i class="fa-solid fa-check"></i></span>3-mood blending</li>
+          <li class="plan-feature"><span class="plan-feature-check"><i class="fa-solid fa-check"></i></span>Adaptive AI learning</li>
+          <li class="plan-feature"><span class="plan-feature-check"><i class="fa-solid fa-check"></i></span>All platform exports</li>
+        </ul>
+        <a href="https://apps.apple.com/us/app/melomo/id6751825937" target="_blank" rel="noopener" class="plan-cta primary"><i class="fa-brands fa-apple"></i> Get Mood+</a>
+      </div>
+      <div class="price-card reveal reveal-delay-3">
+        <div class="plan-name">Maestro</div>
+        <div class="plan-price">
+          <span class="price-currency">$</span>
+          <span class="price-amount">18</span>
+          <span class="price-period">/ mo</span>
+        </div>
+        <p class="plan-tagline">For those who live inside music</p>
+        <ul class="plan-features">
+          <li class="plan-feature"><span class="plan-feature-check"><i class="fa-solid fa-check"></i></span>Everything in Mood+</li>
+          <li class="plan-feature"><span class="plan-feature-check"><i class="fa-solid fa-check"></i></span>Custom mood creation</li>
+          <li class="plan-feature"><span class="plan-feature-check"><i class="fa-solid fa-check"></i></span>Mood history & analytics</li>
+          <li class="plan-feature"><span class="plan-feature-check"><i class="fa-solid fa-check"></i></span>Early access features</li>
+          <li class="plan-feature"><span class="plan-feature-check"><i class="fa-solid fa-check"></i></span>Priority AI generation</li>
+        </ul>
+        <a href="https://apps.apple.com/us/app/melomo/id6751825937" target="_blank" rel="noopener" class="plan-cta ghost"><i class="fa-brands fa-apple"></i> Go Maestro</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DOWNLOAD -->
+<section id="download" class="download">
+  <div class="download-content reveal">
+    <div class="section-eyebrow">Get the App</div>
+    <h2 class="download-title">Your perfect playlist is<br><em>one mood away</em></h2>
+    <p class="download-desc">MeloMo lives in your pocket. Open it anywhere — on the train, in bed at 3am, before a workout — and music will meet you exactly where you are.</p>
+    <div class="store-badges">
+      <a href="https://apps.apple.com/us/app/melomo/id6751825937" target="_blank" rel="noopener" class="store-badge">
+        <i class="fa-brands fa-apple" style="font-size:30px;color:var(--text-primary);"></i>
+        <div class="store-badge-text">
+          <span class="store-badge-sub">Download on the</span>
+          <span class="store-badge-name">App Store</span>
+        </div>
+      </a>
+    </div>
+    <div style="margin-top:28px;display:flex;align-items:center;gap:16px;">
+      <div style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);">Also available at</div>
+      <a href="https://melomo.app" style="font-family:var(--font-mono);font-size:12px;color:var(--gold);text-decoration:none;">melomo.app</a>
+    </div>
+  </div>
+  <div class="download-visual reveal reveal-delay-2">
+    <div class="dl-phone-wrap">
+      <div class="dl-phone-bg"></div>
+      <div class="phone-mockup" style="transform:perspective(1200px) rotateX(4deg) rotateY(8deg);">
+        <div class="phone-notch"></div>
+        <div class="phone-screen" style="background:linear-gradient(160deg,#0f0a1f 0%,#0a0f0f 100%);min-height:480px;">
+          <div style="position:absolute;top:0;left:0;right:0;height:220px;background:radial-gradient(ellipse at 50% 0%,rgba(201,169,110,0.18) 0%,transparent 70%);"></div>
+          <div style="position:relative;z-index:1;">
+            <div style="text-align:center;padding:20px 0 16px;">
+              <div style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;">How are you feeling?</div>
+              <div style="font-family:var(--font-display);font-size:24px;font-weight:300;color:var(--text-primary);font-style:italic;">Choose your mood</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 4px;">
+              <div style="background:rgba(124,92,191,0.15);border:1px solid rgba(124,92,191,0.25);border-radius:14px;padding:14px;text-align:center;">
+                <div style="font-size:22px;margin-bottom:6px;color:#b39ddb;"><i class="fa-solid fa-moon"></i></div>
+                <div style="font-size:12px;font-weight:600;color:var(--text-primary);">Melancholy</div>
+              </div>
+              <div style="background:rgba(201,169,110,0.1);border:1px solid rgba(201,169,110,0.2);border-radius:14px;padding:14px;text-align:center;">
+                <div style="font-size:22px;margin-bottom:6px;color:var(--gold);"><i class="fa-solid fa-bolt"></i></div>
+                <div style="font-size:12px;font-weight:600;color:var(--text-primary);">Euphoric</div>
+              </div>
+              <div style="background:rgba(92,191,180,0.1);border:1px solid rgba(92,191,180,0.2);border-radius:14px;padding:14px;text-align:center;">
+                <div style="font-size:22px;margin-bottom:6px;color:var(--teal);"><i class="fa-solid fa-water"></i></div>
+                <div style="font-size:12px;font-weight:600;color:var(--text-primary);">Serene</div>
+              </div>
+              <div style="background:rgba(191,92,124,0.1);border:1px solid rgba(191,92,124,0.2);border-radius:14px;padding:14px;text-align:center;">
+                <div style="font-size:22px;margin-bottom:6px;color:var(--rose);"><i class="fa-solid fa-heart"></i></div>
+                <div style="font-size:12px;font-weight:600;color:var(--text-primary);">Romantic</div>
+              </div>
+            </div>
+            <div style="margin-top:16px;padding:0 4px;">
+              <div style="background:linear-gradient(135deg,var(--gold),#8a6a30);border-radius:50px;padding:14px;text-align:center;">
+                <div style="font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#0a0805;display:flex;align-items:center;justify-content:center;gap:8px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Generate My Playlist</div>
+              </div>
+            </div>
+            <div style="margin-top:16px;padding:0 4px;">
+              <div style="background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:12px;">
+                <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Or describe how you feel...</div>
+                <div style="font-family:var(--font-display);font-size:13px;color:var(--text-secondary);font-style:italic;">"It's 2am and I can't stop thinking—"</div>
+                <div style="width:2px;height:14px;background:var(--gold);display:inline-block;animation:blink 1s step-end infinite;margin-left:2px;vertical-align:middle;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="rating-badge">
+        <div class="rating-num">4.9</div>
+        <div class="rating-stars">
+          <div class="stars">
+            <i class="fa-solid fa-star star" style="font-size:12px;"></i><i class="fa-solid fa-star star" style="font-size:12px;"></i><i class="fa-solid fa-star star" style="font-size:12px;"></i><i class="fa-solid fa-star star" style="font-size:12px;"></i><i class="fa-solid fa-star star" style="font-size:12px;"></i>
+          </div>
+          <div class="rating-count">48,200 ratings</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div>
+        <div class="footer-brand-name" style="display:flex;align-items:center;gap:10px;">
+          <img src="images/meloicon.png" alt="MeloMo" style="width:32px;height:32px;border-radius:8px;">
+          Melo<span>Mo</span>
+        </div>
+        <p class="footer-tagline">Music that meets you exactly<br>where you are — every time.</p>
+        <div class="social-links">
+          <a href="#" class="social-link" aria-label="X / Twitter"><i class="fa-brands fa-x-twitter"></i></a>
+          <a href="#" class="social-link" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+          <a href="#" class="social-link" aria-label="TikTok"><i class="fa-brands fa-tiktok"></i></a>
+          <a href="#" class="social-link" aria-label="YouTube"><i class="fa-brands fa-youtube"></i></a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-title">Product</div>
+        <ul class="footer-links">
+          <li><a href="#how">How It Works</a></li>
+          <li><a href="#moods">Mood Library</a></li>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#pricing">Pricing</a></li>
+          <li><a href="https://apps.apple.com/us/app/melomo/id6751825937" target="_blank" rel="noopener">App Store</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-col-title">Company</div>
+        <ul class="footer-links">
+          <li><a href="https://melomo.app" target="_blank" rel="noopener">About</a></li>
+          <li><a href="https://melomo.app" target="_blank" rel="noopener">Blog</a></li>
+          <li><a href="https://melomo.app" target="_blank" rel="noopener">Careers</a></li>
+          <li><a href="https://melomo.app" target="_blank" rel="noopener">Press</a></li>
+          <li><a href="mailto:hello@melomo.app">Contact</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-col-title">Legal</div>
+        <ul class="footer-links">
+          <li><a href="https://melomo.app/privacy" target="_blank" rel="noopener">Privacy Policy</a></li>
+          <li><a href="https://melomo.app/terms" target="_blank" rel="noopener">Terms of Service</a></li>
+          <li><a href="https://melomo.app/cookies" target="_blank" rel="noopener">Cookie Policy</a></li>
+          <li><a href="https://melomo.app/licenses" target="_blank" rel="noopener">Licenses</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 MeloMo Inc. All rights reserved.</span>
+      <span style="font-family:var(--font-display);font-style:italic;color:var(--text-muted);">Made with <i class="fa-solid fa-heart" style="color:var(--rose);font-size:11px;"></i> feeling.</span>
+      <a href="https://melomo.app" target="_blank" rel="noopener">melomo.app</a>
+    </div>
+  </div>
+</footer>
+
+<style>
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+</style>
+
+<script>
+// Custom Cursor
+const cursor = document.getElementById('cursor');
+const cursorRing = document.getElementById('cursorRing');
+let mouseX = 0, mouseY = 0;
+let ringX = 0, ringY = 0;
+
+document.addEventListener('mousemove', (e) => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+  cursor.style.transform = `translate(${mouseX - 4}px, ${mouseY - 4}px)`;
+});
+
+function animateRing() {
+  ringX += (mouseX - ringX - 16) * 0.12;
+  ringY += (mouseY - ringY - 16) * 0.12;
+  cursorRing.style.transform = `translate(${ringX}px, ${ringY}px)`;
+  requestAnimationFrame(animateRing);
+}
+animateRing();
+
+document.querySelectorAll('a, button, .mood-card, .step-card, .feature-card').forEach(el => {
+  el.addEventListener('mouseenter', () => {
+    cursor.style.width = '12px';
+    cursor.style.height = '12px';
+    cursorRing.style.width = '48px';
+    cursorRing.style.height = '48px';
+  });
+  el.addEventListener('mouseleave', () => {
+    cursor.style.width = '8px';
+    cursor.style.height = '8px';
+    cursorRing.style.width = '32px';
+    cursorRing.style.height = '32px';
+  });
+});
+
+// Scroll effects
+const nav = document.getElementById('mainNav');
+const scrollBar = document.getElementById('scrollBar');
+
+window.addEventListener('scroll', () => {
+  const scrolled = window.scrollY;
+  const total = document.documentElement.scrollHeight - window.innerHeight;
+  scrollBar.style.transform = `scaleX(${scrolled / total})`;
+  nav.classList.toggle('scrolled', scrolled > 60);
+});
+
+// Reveal on scroll
+const reveals = document.querySelectorAll('.reveal');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) e.target.classList.add('visible');
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+reveals.forEach(r => observer.observe(r));
+
+// Phone tilt on mouse
+const phone = document.querySelector('.phone-mockup');
+document.addEventListener('mousemove', (e) => {
+  if (!phone) return;
+  const rect = phone.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const dx = (e.clientX - cx) / window.innerWidth;
+  const dy = (e.clientY - cy) / window.innerHeight;
+  phone.style.transform = `perspective(1200px) rotateX(${6 - dy * 8}deg) rotateY(${-4 + dx * 8}deg)`;
+});
+
+// Mobile menu
+const mobileMenu = document.getElementById('mobileMenu');
+const navHamburger = document.getElementById('navHamburger');
+const mobileMenuClose = document.getElementById('mobileMenuClose');
+
+function openMenu() {
+  mobileMenu.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeMenu() {
+  mobileMenu.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+if (navHamburger) navHamburger.addEventListener('click', openMenu);
+if (mobileMenuClose) mobileMenuClose.addEventListener('click', closeMenu);
+
+// Close menu on any link click inside mobile menu
+if (mobileMenu) {
+  mobileMenu.querySelectorAll('a').forEach(link => {
+    link.addEventListener('click', closeMenu);
+  });
+}
+</script>
+</body>
+</html>
