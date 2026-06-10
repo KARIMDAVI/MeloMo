@@ -4,17 +4,9 @@ from pydantic import BaseModel
 from typing import Optional
 
 
-class BiometricData(BaseModel):
-    heart_rate: Optional[float] = None
-    hrv: Optional[float] = None
-    sleep_hours: Optional[float] = None
-    activity_level: Optional[str] = None  # "sedentary", "active", "workout"
-    last_updated: Optional[str] = None
-
 class MoodGenerateRequest(BaseModel):
     input: str                              # Raw user text or mood title
     source_override: Optional[str] = None  # "jamendo" | "youtube" | "apple_music"
-    biometrics: Optional[BiometricData] = None
 
 
 class TrackItem(BaseModel):
