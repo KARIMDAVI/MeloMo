@@ -13,49 +13,26 @@ struct OnboardingView: View {
                 .environmentObject(authManager)
         } else {
             ZStack {
-                // Dark background
-                Color.black
-                    .ignoresSafeArea()
+                // Assuming ThemeColors is defined elsewhere in the project
+                // Color.black.ignoresSafeArea()
                 
-                VStack(spacing: 40) {
+                VStack(spacing: 24) {
                     Spacer()
                     
                     // App Logo and Branding
-                    VStack(spacing: 16) {
-                        // Logo
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.orange, .purple, .blue],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 80, height: 80)
-                                .blur(radius: 20)
-                            
-                            Image(systemName: "music.note")
-                                .font(.system(size: 40, weight: .bold))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [.pink, .cyan],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                        }
+                    VStack(spacing: 12) {
+                        // Assuming Text.fa and Icons are defined elsewhere
+                        Image(systemName: "music.quarternote.3")
+                            .font(.system(size: 50))
+                            .foregroundColor(.purple)
                         
-                        // App Name
                         Text("MeloMo")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
+                            .font(.largeTitle).fontWeight(.bold)
                             .foregroundColor(.white)
                         
-                        // Tagline
-                        Text("Unlock your full music journey")
+                        Text("Find Your Vibe")
                             .font(.headline)
-                            .foregroundColor(.orange)
+                            .foregroundColor(.gray)
                     }
                     
                     Spacer()
@@ -79,102 +56,74 @@ struct OnboardingView: View {
                     
                     // Sign In Buttons
                     VStack(spacing: 16) {
-                        // Sign in with Apple
                         SignInWithAppleButton(
-                            onRequest: { request in
-                                request.requestedScopes = [.fullName, .email]
-                            },
-                            onCompletion: { result in
-                                handleAppleSignIn(result: result)
-                            }
+                            onRequest: { request in request.requestedScopes = [.fullName, .email] },
+                            onCompletion: { result in handleAppleSignIn(result: result) }
                         )
                         .signInWithAppleButtonStyle(.white)
                         .frame(height: 50)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .cornerRadius(12)
                         
-                        // Continue with Google
-                        Button(action: {
-                            handleGoogleSignIn()
-                        }) {
-                            HStack {
-                                if isLoading {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        .scaleEffect(0.8)
-                                } else {
-                                    Image("google-signin")
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                        .frame(width: 20, height: 20)
-                                }
-                                
-                                Text("Continue with Google")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color.blue)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .disabled(isLoading)
-                        
-                        // Try Demo Account
-                        Button(action: {
-                            handleDemoSignIn()
-                        }) {
-                            HStack {
-                                Image(systemName: "person")
-                                    .font(.title2)
-                                    .foregroundColor(.white)
-                                
-                                Text("Try Demo Account")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color.green)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .disabled(isLoading)
-                    }
-                    .padding(.horizontal, 40)
-                    
-                    // Features
-                    VStack(spacing: 20) {
-                        FeatureRow(
-                            icon: "chart.bar",
-                            title: "Track Your Stats",
-                            description: "Monitor your listening habits and achievements"
-                        )
-                        
-                        FeatureRow(
-                            icon: "trophy",
-                            title: "Play Challenges",
-                            description: "Test your music knowledge with trivia"
-                        )
-                        
-                        FeatureRow(
-                            icon: "gear",
-                            title: "Customize Experience",
-                            description: "Personalize your app settings and preferences"
-                        )
+                        googleSignInButton
+                        demoSignInButton
                     }
                     .padding(.horizontal, 40)
                     
                     Spacer()
                     
-                    // Continue as Guest
-                    Button("Continue as Guest") {
-                        handleGuestContinue()
-                    }
-                    .font(.body)
-                    .foregroundColor(.orange)
-                    .padding(.bottom, 20)
+                    guestContinueButton
                 }
             }
+            .background(Color.black.ignoresSafeArea())
         }
+    }
+    
+    // MARK: - Subviews
+    private var googleSignInButton: some View {
+        Button(action: handleGoogleSignIn) {
+            HStack {
+                if isLoading {
+                    ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else {
+                    // Assuming google icon is in assets
+                    Image("google-signin")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 20, height: 20)
+                }
+                Text("Continue with Google")
+            }
+            .font(.headline)
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.blue) // Use Google's brand blue
+            .cornerRadius(12)
+        }
+        .disabled(isLoading)
+    }
+    
+    private var demoSignInButton: some View {
+        Button(action: handleDemoSignIn) {
+            HStack {
+                Image(systemName: "person.fill")
+                Text("Try Demo Account")
+            }
+            .font(.headline)
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.green)
+            .cornerRadius(12)
+        }
+        .disabled(isLoading)
+    }
+    
+    private var guestContinueButton: some View {
+        Button("Continue as Guest") { handleGuestContinue() }
+            .font(.body)
+            .foregroundColor(.orange)
+            .padding(.bottom, 20)
     }
     
     // MARK: - Sign In Handlers
@@ -225,33 +174,6 @@ struct OnboardingView: View {
     private func handleGuestContinue() {
         authManager.continueAsGuest()
         showMainApp = true
-    }
-}
-
-struct FeatureRow: View {
-    let icon: String
-    let title: String
-    let description: String
-    
-    var body: some View {
-        HStack(spacing: 16) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(.orange)
-                .frame(width: 24)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundColor(.orange)
-                
-                Text(description)
-                    .font(.body)
-                    .foregroundColor(.gray)
-            }
-            
-            Spacer()
-        }
     }
 }
 

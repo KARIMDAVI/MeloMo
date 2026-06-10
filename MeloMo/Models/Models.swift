@@ -183,13 +183,25 @@ struct MusicTrack: Identifiable, Codable {
     let energy: Double
     let genre: String?
     let mood: String?
-    
+    // Backend-provided fields — nil for locally-generated tracks
+    let streamURL: URL?
+    let matchReason: String?
+    // Offline support
+    var localFileURL: URL?
+
     // MARK: - Codable Implementation
     enum CodingKeys: String, CodingKey {
         case id, title, artist, album, artworkURL, duration, energy, genre, mood
+        case streamURL = "stream_url"
+        case matchReason = "match_reason"
+        case localFileURL = "local_file_url"
     }
-    
-    init(id: String, title: String, artist: String, album: String? = nil, artworkURL: URL? = nil, duration: TimeInterval, energy: Double, genre: String? = nil, mood: String? = nil) {
+
+    init(id: String, title: String, artist: String, album: String? = nil,
+         artworkURL: URL? = nil, duration: TimeInterval, energy: Double,
+         genre: String? = nil, mood: String? = nil,
+         streamURL: URL? = nil, matchReason: String? = nil,
+         localFileURL: URL? = nil) {
         self.id = id
         self.title = title
         self.artist = artist
@@ -199,6 +211,9 @@ struct MusicTrack: Identifiable, Codable {
         self.energy = energy
         self.genre = genre
         self.mood = mood
+        self.streamURL = streamURL
+        self.matchReason = matchReason
+        self.localFileURL = localFileURL
     }
 }
 

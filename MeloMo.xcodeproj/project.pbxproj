@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		3C204C572E7E51E400888042 /* YouTubePlayerKit in Frameworks */ = {isa = PBXBuildFile; productRef = 3C204C562E7E51E400888042 /* YouTubePlayerKit */; };
+		ECCD49E2BC7ACD162C6D5050 /* FontAwesome in Frameworks */ = {isa = PBXBuildFile; productRef = C77C9D4F3588FFFA3BBBEA98 /* FontAwesome */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +71,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3C204C572E7E51E400888042 /* YouTubePlayerKit in Frameworks */,
+				ECCD49E2BC7ACD162C6D5050 /* FontAwesome in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -131,6 +133,7 @@
 			name = MeloMo;
 			packageProductDependencies = (
 				3C204C562E7E51E400888042 /* YouTubePlayerKit */,
+				C77C9D4F3588FFFA3BBBEA98 /* FontAwesome */,
 			);
 			productName = MeloMo;
 			productReference = 3C9E42052E6283C30052A727 /* MeloMo.app */;
@@ -217,6 +220,7 @@
 			packageReferences = (
 				3C923D542E74D96D00707AD6 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				3C204C552E7E51A300888042 /* XCRemoteSwiftPackageReference "YouTubePlayerKit" */,
+				5195693C328B9C46B7E8D949 /* XCRemoteSwiftPackageReference "FontAwesome" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3C9E42062E6283C30052A727 /* Products */;
@@ -601,12 +605,25 @@
 				minimumVersion = 9.0.0;
 			};
 		};
+		5195693C328B9C46B7E8D949 /* XCRemoteSwiftPackageReference "FontAwesome" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/thii/FontAwesome.swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		3C204C562E7E51E400888042 /* YouTubePlayerKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = YouTubePlayerKit;
+		};
+		C77C9D4F3588FFFA3BBBEA98 /* FontAwesome */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5195693C328B9C46B7E8D949 /* XCRemoteSwiftPackageReference "FontAwesome" */;
+			productName = FontAwesome;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

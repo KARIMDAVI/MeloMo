@@ -5,172 +5,263 @@ import AVFAudio
 import StoreKit
 import os
 
+// MARK: - MusicController
+// Orchestrates playback + playlist generation across all providers.
+// recentMoods / favoriteMoods use EnhancedMood so the UI never has to convert types.
+// generate(for:) accepts EnhancedMood directly — the bridge conversion in EnhancedVibesView is gone.
+private func getBroadGenre(_ mood: EnhancedMood) -> String {
+    switch mood.category {
+    case .energetic:              return mood.energy > 0.8 ? "upbeat pop dance" : "pop rock"
+    case .relaxed, .chill:        return "chill indie ambient"
+    case .emotional, .melancholy: return "indie ballad emotional"
+    case .focused:                return "instrumental focus classical"
+    case .social:                 return "party pop dance"
+    default:                      return "popular music"
+    }
+}
+
 @MainActor
 final class MusicController: ObservableObject {
     // MARK: - Published Properties
     @Published var provider: Provider = {
-        if let savedProvider = UserDefaults.standard.string(forKey: "provider"),
-           let provider = Provider(rawValue: savedProvider) {
-            return provider
-        }
+        if let saved = UserDefaults.standard.string(forKey: "provider"),
+           let p = Provider(rawValue: saved) { return p }
         return .appleMusic
     }() {
-        didSet { 
+        didSet {
             UserDefaults.standard.set(provider.rawValue, forKey: "provider")
             updateStatistics()
         }
     }
-    
-    @Published var currentMood: Mood? = nil
+
+    @Published var currentMood: EnhancedMood? = nil
     @Published var isAuthorizedForAppleMusic = false
+    @Published var isOfflineMode = false
     @Published var lastGeneratedLink: PlaylistLink? = nil
     @Published var isLoading = false
     @Published var errorMessage: String? = nil
     @Published var userPreferences = UserPreferences()
     @Published var statistics = AppStatistics()
-    @Published var recentMoods: [Mood] = []
-    @Published var favoriteMoods: [Mood] = []
+    @Published var recentMoods: [EnhancedMood] = []   // was [Mood] — migrated to EnhancedMood
+    @Published var favoriteMoods: [EnhancedMood] = [] // was [Mood] — migrated to EnhancedMood
     @Published var currentTrackArtworkURL: URL? = nil
-    
+    @Published var playbackSource: PlaybackSource = .youtube
+    @Published var jamendoPlayer = JamendoPlayer()
+    @Published var youtubeManager = YouTubePlaybackManager()
+    @Published var backendResponse: MoodGenerateResponse? = nil
+    @Published var moodSuggestions: [MoodSuggestion] = []
+    @Published var trendingVibes: [[String: String]] = []
+
     // MARK: - Private Properties
     private let log = Logger(subsystem: "com.melomo.app", category: "music")
     private let userDefaults = UserDefaults.standard
     private var lastGenerationTime: Date?
-    
+
     // MARK: - Initialization
     init() {
         loadUserPreferences()
         loadStatistics()
         loadRecentMoods()
         loadFavoriteMoods()
-        
-        // Initialize Apple Music authorization status
-        Task {
-            await refreshAuthorizationStatus()
-        }
+
+        Task { await refreshAuthorizationStatus() }
     }
-    
+
     // MARK: - Public Methods
-    
-    /// Generate & play (Apple Music) or handoff (Spotify)
-    func generate(for mood: Mood) async {
-        guard !isLoading else { 
-            Haptics.warning()
-            return 
+
+    /**
+     Generates a playlist from the backend based on the provided mood.
+     
+     This function sends a request to the backend to generate a playlist. The backend will then route the request to the appropriate music provider (Jamendo, YouTube, or Apple Music) based on the mood. If the backend is unavailable, it will fall back to the on-device NL classifier.
+     
+     - Parameter mood: The mood to generate a playlist for.
+     */
+    func generate(for mood: EnhancedMood) async {
+        guard !isLoading else { Haptics.warning(); return }
+        guard Date().timeIntervalSince(lastGenerationTime ?? .distantPast) >= 2 else {
+            Haptics.warning(); return
         }
-        
-        // Prevent rapid successive generations
-        if let lastTime = lastGenerationTime,
-           Date().timeIntervalSince(lastTime) < 2.0 {
-            Haptics.warning()
-            return
-        }
-        
+
         currentMood = mood
         errorMessage = nil
         isLoading = true
         lastGenerationTime = Date()
-        
         defer { isLoading = false }
-        
-        // Add to recent moods
+
         addToRecentMoods(mood)
-        
-        // Update statistics
+        JournalManager.shared.logMood(title: mood.title, emoji: mood.emoji)
+        Task { await BackendClient.shared.publishVibe(mood: mood.title, emoji: mood.emoji) }
+        StreakManager.shared.recordActivity()   // consecutive-day streak
         statistics.totalPlaylistsGenerated += 1
         statistics.lastUsedDate = Date()
-        statistics.mostUsedProvider = provider
         saveStatistics()
-        
         Haptics.moodSelected()
-        
-        switch provider {
-        case .appleMusic:
-            await generateAppleMusicPlaylist(mood: mood)
-        case .spotify:
-            await generateSpotifyPlaylist(mood: mood)
-        case .youtubeMusic:
-            await generateYoutubeMusicPlaylist(mood: mood)
+
+        do {
+            let response = try await BackendClient.shared.generatePlaylist(input: mood.title)
+            backendResponse = response
+            moodSuggestions = response.topMoods
+
+            // rawValue matching fails for "youtube" vs "YouTube" — lowercase switch is safer
+            let source: PlaybackSource
+            switch response.source.lowercased() {
+            case "jamendo":     source = .jamendo
+            case "apple_music": source = .appleMusic
+            default:            source = .youtube
+            }
+            playbackSource = source
+
+            let tracks = response.tracks.map { $0.toMusicTrack() }
+            switch source {
+            case .jamendo:
+                jamendoPlayer.load(tracks: tracks)
+            case .youtube:
+                let videoIds = response.tracks.compactMap { $0.videoId }
+                youtubeManager.load(tracks: tracks, videoIds: videoIds)
+            case .appleMusic:
+                // Apple Music flow unchanged — backend doesn't control MusicKit playback
+                await generateAppleMusicPlaylist(mood: mood)
+            }
+            Haptics.playlistGenerated()
+        } catch {
+            // On backend failure, fall back to Apple Music search via on-device classifier
+            if let fallbackTitle = MoodFallbackClassifier.classify(mood.title),
+               let _ = enhancedMoods.first(where: { $0.title == fallbackTitle }) {
+                errorMessage = "Using offline mode — backend unavailable"
+                await generateAppleMusicPlaylist(mood: mood)
+            } else {
+                errorMessage = error.localizedDescription
+                Haptics.error()
+            }
         }
     }
-    
-    /// Request Apple Music authorization
-    func requestAuthorization() async {
-        await refreshAuthorizationStatus()
+
+    /**
+     Generates a playlist from the backend based on the provided text input.
+     
+     This function sends a request to the backend to generate a playlist. The backend will then classify the text and generate a playlist based on the classified mood. This function runs in parallel with the on-device fallback in NLMoodInputView.
+     
+     - Parameter input: The text to generate a playlist for.
+     */
+    func generate(forText input: String) async {
+        guard !isLoading else { return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let response = try await BackendClient.shared.generatePlaylist(input: input)
+            backendResponse = response
+            moodSuggestions = response.topMoods
+        } catch {
+            moodSuggestions = []    // Silent fallback — on-device classifier already handled the pick
+        }
     }
-    
-    /// Check if Apple Music is authorized
-    var isAuthorized: Bool {
-        return isAuthorizedForAppleMusic
+
+    /**
+     Generates a playlist based on the user's current biometrics (Magic Mood).
+     */
+    func generateMagicMood() async {
+        guard !isLoading else { return }
+        
+        // Request HealthKit authorization if needed
+        let authorized = await HealthKitManager.shared.requestAuthorization()
+        guard authorized else {
+            errorMessage = "HealthKit access required for Magic Mood."
+            Haptics.error()
+            return
+        }
+
+        isLoading = true
+        defer { isLoading = false }
+        
+        do {
+            let biometrics = await HealthKitManager.shared.fetchLatestBiometrics()
+            // We use a generic "How do I feel?" prompt which the backend will enrich with biometric data
+            let response = try await BackendClient.shared.generatePlaylist(input: "Detect my mood from biometrics", biometrics: biometrics)
+            
+            backendResponse = response
+            moodSuggestions = response.topMoods
+            
+            // Map the returned mood to an EnhancedMood if possible, otherwise use fallback logic
+            if let matchedMood = enhancedMoods.first(where: { $0.title.lowercased() == response.mood.lowercased() }) {
+                currentMood = matchedMood
+                addToRecentMoods(matchedMood)
+                JournalManager.shared.logMood(title: matchedMood.title, emoji: matchedMood.emoji, biometrics: biometrics)
+                Task { await BackendClient.shared.publishVibe(mood: matchedMood.title, emoji: matchedMood.emoji) }
+            }
+            
+            let source: PlaybackSource
+            switch response.source.lowercased() {
+            case "jamendo":     source = .jamendo
+            case "apple_music": source = .appleMusic
+            default:            source = .youtube
+            }
+            playbackSource = source
+            
+            let tracks = response.tracks.map { $0.toMusicTrack() }
+            switch source {
+            case .jamendo:
+                jamendoPlayer.load(tracks: tracks)
+            case .youtube:
+                let videoIds = response.tracks.compactMap { $0.videoId }
+                youtubeManager.load(tracks: tracks, videoIds: videoIds)
+            case .appleMusic:
+                if let mood = currentMood {
+                    await generateAppleMusicPlaylist(mood: mood)
+                }
+            }
+            Haptics.playlistGenerated()
+        } catch {
+            errorMessage = "Magic Mood failed: \(error.localizedDescription)"
+            Haptics.error()
+        }
     }
-    
-    /// Check if music is currently playing
+
+    func requestAuthorization() async { await refreshAuthorizationStatus() }
+
+    func fetchTrendingVibes() async {
+        trendingVibes = await BackendClient.shared.getTrendingVibes()
+    }
+
+    func downloadCurrentPlaylist() {
+        guard playbackSource == .jamendo, let response = backendResponse else { return }
+        
+        for track in response.tracks {
+            DownloadManager.shared.download(track.toMusicTrack())
+        }
+        Haptics.successPattern()
+    }
+
+    var isAuthorized: Bool { isAuthorizedForAppleMusic }
+
     var isPlaying: Bool {
-        return ApplicationMusicPlayer.shared.state.playbackStatus == .playing
+        ApplicationMusicPlayer.shared.state.playbackStatus == .playing
     }
-    
-    /// Skip to next track
+
     func skipToNext() async {
         do {
             try await ApplicationMusicPlayer.shared.skipToNextEntry()
-            log.info("Skipped to next track")
         } catch {
-            log.error("Failed to skip to next track: \(error.localizedDescription)")
+            log.error("Failed to skip forward: \(error.localizedDescription)")
         }
     }
-    
-    /// Skip to previous track
+
     func skipToPrevious() async {
         do {
             try await ApplicationMusicPlayer.shared.skipToPreviousEntry()
-            log.info("Skipped to previous track")
         } catch {
-            log.error("Failed to skip to previous track: \(error.localizedDescription)")
+            log.error("Failed to skip back: \(error.localizedDescription)")
         }
     }
-    
-    /// Get current playing song information
+
     var currentPlayingTrack: MusicTrack? {
         guard let currentEntry = ApplicationMusicPlayer.shared.queue.currentEntry,
-              let song = currentEntry.item as? Song else {
-            log.debug("No current track available from Apple Music player")
-            return nil
-        }
-        
-        log.info("🎵 Getting track info for: \(song.title) by \(song.artistName)")
-        
-        // The issue might be that we need to access the artwork differently
-        // Let's try a more direct approach
-        var artworkURL: URL? = nil
-        
-        if let artwork = song.artwork {
-            log.info("✅ Song HAS artwork property")
-            log.info("📐 Artwork max dimensions: \(artwork.maximumWidth)x\(artwork.maximumHeight)")
-            
-            // Try the most common sizes that Apple Music supports
-            artworkURL = artwork.url(width: 300, height: 300)
-            log.info("🖼️ 300x300 URL: \(artworkURL?.absoluteString ?? "nil")")
-            
-            if artworkURL == nil {
-                artworkURL = artwork.url(width: 512, height: 512)
-                log.info("🖼️ 512x512 URL: \(artworkURL?.absoluteString ?? "nil")")
-            }
-            
-            if artworkURL == nil {
-                artworkURL = artwork.url(width: 200, height: 200)
-                log.info("🖼️ 200x200 URL: \(artworkURL?.absoluteString ?? "nil")")
-            }
-            
-            if artworkURL == nil {
-                artworkURL = artwork.url(width: 100, height: 100)
-                log.info("🖼️ 100x100 URL: \(artworkURL?.absoluteString ?? "nil")")
-            }
-        } else {
-            log.error("❌ Song has NO artwork property at all")
-        }
-        
-        log.info("🎨 FINAL ARTWORK URL: \(artworkURL?.absoluteString ?? "NONE FOUND")")
-        
+              let song = currentEntry.item as? Song else { return nil }
+
+        // Try common artwork sizes — 300px is the sweet spot for card display
+        let artworkURL = song.artwork?.url(width: 300, height: 300)
+            ?? song.artwork?.url(width: 512, height: 512)
+            ?? song.artwork?.url(width: 100, height: 100)
+
         return MusicTrack(
             id: song.id.rawValue,
             title: song.title,
@@ -183,38 +274,34 @@ final class MusicController: ObservableObject {
             mood: currentMood?.title
         )
     }
-    
-    
-    /// Refresh Apple Music authorization status
+
+    // MARK: - Authorization
+
+    /**
+     Refreshes the authorization status for Apple Music.
+     
+     This function checks the current authorization status for Apple Music and updates the `isAuthorizedForAppleMusic` property accordingly. It also requests authorization if the status is not determined.
+     */
     func refreshAuthorizationStatus() async {
-        do {
-            switch MusicAuthorization.currentStatus {
-            case .authorized: 
-                isAuthorizedForAppleMusic = true
-                Haptics.successPattern()
-            case .notDetermined:
-                let status = await MusicAuthorization.request()
-                isAuthorizedForAppleMusic = (status == .authorized)
-                if isAuthorizedForAppleMusic {
-                    Haptics.successPattern()
-                } else {
-                    Haptics.error()
-                }
-            default: 
-                isAuthorizedForAppleMusic = false
-                Haptics.error()
-            }
-        } catch {
-            log.error("Authorization error: \(error.localizedDescription)")
+        switch MusicAuthorization.currentStatus {
+        case .authorized:
+            isAuthorizedForAppleMusic = true
+            Haptics.successPattern()
+        case .notDetermined:
+            let status = await MusicAuthorization.request()
+            isAuthorizedForAppleMusic = (status == .authorized)
+            isAuthorizedForAppleMusic ? Haptics.successPattern() : Haptics.error()
+        default:
             isAuthorizedForAppleMusic = false
             Haptics.error()
         }
     }
-    
-    /// Toggle favorite status for a mood
-    func toggleFavorite(_ mood: Mood) {
-        if let index = favoriteMoods.firstIndex(where: { $0.id == mood.id }) {
-            favoriteMoods.remove(at: index)
+
+    // MARK: - Mood Favorites
+
+    func toggleFavorite(_ mood: EnhancedMood) {
+        if let idx = favoriteMoods.firstIndex(where: { $0.id == mood.id }) {
+            favoriteMoods.remove(at: idx)
             Haptics.light()
         } else {
             favoriteMoods.append(mood)
@@ -222,68 +309,62 @@ final class MusicController: ObservableObject {
         }
         saveFavoriteMoods()
     }
-    
-    /// Check if a mood is favorited
-    func isFavorite(_ mood: Mood) -> Bool {
-        return favoriteMoods.contains { $0.id == mood.id }
+
+    func isFavorite(_ mood: EnhancedMood) -> Bool {
+        favoriteMoods.contains { $0.id == mood.id }
     }
-    
-    /// Get moods by category
-    func getMoodsByCategory(_ category: MoodCategory) -> [Mood] {
-        return allMoods.filter { $0.category == category }
+
+    // MARK: - Mood Queries
+
+    /// Fixed: was referencing nonexistent `allMoods` — use `enhancedMoods` global
+    func getMoodsByCategory(_ category: MoodCategory) -> [EnhancedMood] {
+        enhancedMoods.filter { $0.category == category }
     }
-    
-    /// Get popular moods
-    func getPopularMoods() -> [Mood] {
-        return allMoods.filter { $0.popularity >= 4 }
+
+    func getPopularMoods() -> [EnhancedMood] {
+        enhancedMoods.filter { $0.popularity >= 4 }
     }
-    
-    /// Get random mood for discovery
-    func getRandomMood() -> Mood? {
-        let availableMoods = allMoods.filter { !recentMoods.contains($0) }
-        return availableMoods.randomElement() ?? allMoods.randomElement()
+
+    func getRandomMood() -> EnhancedMood? {
+        // contains(where:) since EnhancedMood isn't Equatable
+        let available = enhancedMoods.filter { m in !recentMoods.contains { $0.id == m.id } }
+        return available.randomElement() ?? enhancedMoods.randomElement()
     }
-    
-    // MARK: - Private Methods
-    
-    private func generateAppleMusicPlaylist(mood: Mood) async {
+
+    // MARK: - Private Generation
+
+    private func generateAppleMusicPlaylist(mood: EnhancedMood) async {
         guard isAuthorizedForAppleMusic else {
             errorMessage = MeloMoError.authorizationFailed.errorDescription
             Haptics.error()
             return
         }
-        
+
         do {
             let url = try await playAppleMusicPlaylist(mood: mood)
             lastGeneratedLink = .appleMusic(url)
             Haptics.playlistGenerated()
         } catch {
-            let error = error as? MeloMoError ?? .networkError
-            errorMessage = error.errorDescription
+            let melomErr = error as? MeloMoError ?? .networkError
+            errorMessage = melomErr.errorDescription
             log.error("Apple Music error: \(error.localizedDescription)")
             Haptics.error()
         }
     }
-    
-    private func generateSpotifyPlaylist(mood: Mood) async {
+
+    private func generateSpotifyPlaylist(mood: EnhancedMood) async {
         let url = buildSpotifyHandoffURL(mood: mood)
         lastGeneratedLink = .spotify(url)
-        
-        // For now, just generate the link without auto-opening Spotify
-        // User can manually tap to open when ready
-        log.info("Generated Spotify playlist link for mood: \(mood.title)")
+        log.info("Spotify handoff link generated for: \(mood.title)")
         Haptics.playlistGenerated()
-        
-        // Note: In-app Spotify playback would require Spotify iOS SDK
-        // and proper authentication setup which is complex
+        // Note: in-app Spotify playback requires their iOS SDK + OAuth — not worth the complexity
         errorMessage = "Spotify playlist ready! Tap the music bar to open Spotify."
     }
-    
-    private func generateYoutubeMusicPlaylist(mood: Mood) async {
+
+    private func generateYoutubeMusicPlaylist(mood: EnhancedMood) async {
         let url = buildYoutubeMusicURL(mood: mood)
         lastGeneratedLink = .youtubeMusic(url)
-        
-        // open YouTube Music if available, else show share
+
         if UIApplication.shared.canOpenURL(url) {
             await UIApplication.shared.open(url)
             Haptics.playlistGenerated()
@@ -291,218 +372,142 @@ final class MusicController: ObservableObject {
             Haptics.warning()
         }
     }
-    
-    private func buildYoutubeMusicURL(mood: Mood) -> URL {
+
+    private func buildYoutubeMusicURL(mood: EnhancedMood) -> URL {
         let q = (mood.seeds + [mood.title, "music"]).joined(separator: " ")
         let encoded = q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? mood.title
-        
-        // YouTube Music deep link
-        guard let url = URL(string: "youtubemusic://search/\(encoded)") else {
-            // Fallback to web search if deep link fails
-            let webQuery = q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? mood.title
-            return URL(string: "https://music.youtube.com/search?q=\(webQuery)") ?? URL(string: "https://music.youtube.com")!
-        }
-        return url
+
+        return URL(string: "youtubemusic://search/\(encoded)")
+            ?? URL(string: "https://music.youtube.com/search?q=\(encoded)")
+            ?? URL(string: "https://music.youtube.com")!
     }
-    
-    /// Build a basic Apple Music play queue from catalog search.
-    private func playAppleMusicPlaylist(mood: Mood) async throws -> URL {
-        log.info("Generating Apple Music playlist for mood: \(mood.title)")
-        
-        // Try multiple search strategies
+
+    private func playAppleMusicPlaylist(mood: EnhancedMood) async throws -> URL {
+        log.info("Generating Apple Music playlist for: \(mood.title)")
+
         var songs: [Song] = []
-        
-        // Strategy 1: Use original mood seeds
-        let originalQuery = mood.seeds.joined(separator: " OR ")
-        if !originalQuery.isEmpty {
-            log.info("Trying original seeds: \(originalQuery)")
-            var req = MusicCatalogSearchRequest(term: originalQuery, types: [Song.self])
-            req.limit = 25
-            
-            do {
-                let response = try await req.response()
-                songs = Array(response.songs.prefix(25))
-                log.info("Found \(songs.count) songs with original seeds")
-            } catch {
-                log.warning("Original seeds search failed: \(error.localizedDescription)")
+
+        try await withThrowingTaskGroup(of: [Song].self) { group in
+            // Strategy 1: original mood seeds
+            let originalQuery = mood.seeds.joined(separator: " OR ")
+            if !originalQuery.isEmpty {
+                group.addTask {
+                    var req = MusicCatalogSearchRequest(term: originalQuery, types: [Song.self])
+                    req.limit = 25
+                    guard let response = try? await req.response() else { return [] }
+                    return Array(response.songs.prefix(25))
+                }
             }
-        }
-        
-        // Strategy 2: If no results, try simplified search with mood title + generic terms
-        if songs.isEmpty {
-            let fallbackQuery = "\(mood.title) music"
-            log.info("Trying fallback search: \(fallbackQuery)")
-            var req = MusicCatalogSearchRequest(term: fallbackQuery, types: [Song.self])
-            req.limit = 25
-            
-            do {
-                let response = try await req.response()
-                songs = Array(response.songs.prefix(25))
-                log.info("Found \(songs.count) songs with fallback search")
-            } catch {
-                log.warning("Fallback search failed: \(error.localizedDescription)")
+
+            // Strategy 2: mood title + "music"
+            group.addTask {
+                var req = MusicCatalogSearchRequest(term: "\(mood.title) music", types: [Song.self])
+                req.limit = 25
+                guard let response = try? await req.response() else { return [] }
+                return Array(response.songs.prefix(25))
             }
-        }
-        
-        // Strategy 3: If still no results, try broad genre-based search
-        if songs.isEmpty {
-            let broadQuery = getBroadGenreForMood(mood)
-            log.info("Trying broad genre search: \(broadQuery)")
-            var req = MusicCatalogSearchRequest(term: broadQuery, types: [Song.self])
-            req.limit = 25
-            
-            do {
-                let response = try await req.response()
-                songs = Array(response.songs.prefix(25))
-                log.info("Found \(songs.count) songs with broad genre search")
-            } catch {
-                log.warning("Broad genre search failed: \(error.localizedDescription)")
+
+            // Strategy 3: broad genre fallback
+            group.addTask {
+                var req = MusicCatalogSearchRequest(term: getBroadGenre(mood), types: [Song.self])
+                req.limit = 25
+                guard let response = try? await req.response() else { return [] }
+                return Array(response.songs.prefix(25))
             }
-        }
-        
-        // Final check
-        guard !songs.isEmpty else {
-            log.error("All search strategies failed for mood: \(mood.title)")
-            throw MeloMoError.noResultsFound
+
+            for try await searchedSongs in group {
+                songs.append(contentsOf: searchedSongs)
+            }
         }
 
-        // Check Apple Music authorization for songs
-        guard MusicAuthorization.currentStatus == .authorized else {
-            log.error("Apple Music not authorized — cannot play")
-            throw MeloMoError.authorizationFailed
-        }
+        guard !songs.isEmpty else { throw MeloMoError.noResultsFound }
+        guard MusicAuthorization.currentStatus == .authorized else { throw MeloMoError.authorizationFailed }
 
-        // Store the first song's artwork for the music bar
-        let firstSong = songs.shuffled().first!
-        let firstSongArtworkURL = firstSong.artwork?.url(width: 300, height: 300)
-        log.info("🎨 STORING FIRST SONG ARTWORK: \(firstSongArtworkURL?.absoluteString ?? "nil")")
-        
-        // Shuffle and play
-        let sorted = songs.shuffled()
+        let shuffled = songs.shuffled()
+        currentTrackArtworkURL = shuffled.first?.artwork?.url(width: 300, height: 300)
+
         do {
-            try await ApplicationMusicPlayer.shared.queue = .init(for: sorted)
+            try await ApplicationMusicPlayer.shared.queue = .init(for: shuffled)
             try await ApplicationMusicPlayer.shared.play()
-            log.info("Successfully started playbook for mood: \(mood.title)")
-            
-            // Store artwork URL for music bar display
-            currentTrackArtworkURL = firstSongArtworkURL
-            if let artworkURL = firstSongArtworkURL {
-                log.info("✅ ARTWORK STORED FOR MUSIC BAR: \(artworkURL.absoluteString)")
-            } else {
-                log.error("❌ NO ARTWORK TO STORE FOR MUSIC BAR")
-            }
         } catch {
             log.error("MusicKit playback error: \(error.localizedDescription)")
             throw MeloMoError.networkError
         }
-        
-        // Fallback: create a search URL for sharing
-        let shareQuery = originalQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? mood.title
-        let url = URL(string: "https://music.apple.com/search?term=\(shareQuery)")!
-        return url
-    }
-    
-    /// Get broad genre terms for difficult moods
-    private func getBroadGenreForMood(_ mood: Mood) -> String {
-        switch mood.category {
-        case .energetic:
-            return mood.energy > 0.8 ? "upbeat pop dance" : "pop rock"
-        case .relaxed, .chill:
-            return "chill indie ambient"
-        case .emotional, .melancholy:
-            return "indie ballad emotional"
-        case .focused:
-            return "instrumental focus classical"
-        case .social:
-            return "party pop dance"
-        default:
-            return "popular music"
-        }
+
+        // Shareable search URL for PlaylistLink storage
+        let shareQuery = (mood.seeds.joined(separator: " OR ")).addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? mood.title
+        return URL(string: "https://music.apple.com/search?term=\(shareQuery)")!
     }
 
-    /// Spotify: lean handoff via search (no SDK token needed).
-    private func buildSpotifyHandoffURL(mood: Mood) -> URL {
+
+
+    private func buildSpotifyHandoffURL(mood: EnhancedMood) -> URL {
         let q = (mood.seeds + [mood.title, "playlist"]).joined(separator: " ")
         let encoded = q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? mood.title
-        
-        // deep link to Spotify search
-        guard let url = URL(string: "spotify://search/\(encoded)") else {
-            // Fallback to web search if deep link fails
-            let webQuery = q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? mood.title
-            return URL(string: "https://open.spotify.com/search/\(webQuery)") ?? URL(string: "https://open.spotify.com")!
-        }
-        return url
+
+        return URL(string: "spotify://search/\(encoded)")
+            ?? URL(string: "https://open.spotify.com/search/\(encoded)")
+            ?? URL(string: "https://open.spotify.com")!
     }
-    
+
     // MARK: - Data Persistence
-    
+
     private func loadUserPreferences() {
-        if let data = userDefaults.data(forKey: "userPreferences"),
-           let prefs = try? JSONDecoder().decode(UserPreferences.self, from: data) {
-            userPreferences = prefs
-        }
+        guard let data = userDefaults.data(forKey: "userPreferences"),
+              let prefs = try? JSONDecoder().decode(UserPreferences.self, from: data) else { return }
+        userPreferences = prefs
     }
-    
+
     private func saveUserPreferences() {
         if let data = try? JSONEncoder().encode(userPreferences) {
             userDefaults.set(data, forKey: "userPreferences")
         }
     }
-    
+
     private func loadStatistics() {
-        if let data = userDefaults.data(forKey: "statistics"),
-           let stats = try? JSONDecoder().decode(AppStatistics.self, from: data) {
-            statistics = stats
-        }
+        guard let data = userDefaults.data(forKey: "statistics"),
+              let stats = try? JSONDecoder().decode(AppStatistics.self, from: data) else { return }
+        statistics = stats
     }
-    
+
     private func saveStatistics() {
         if let data = try? JSONEncoder().encode(statistics) {
             userDefaults.set(data, forKey: "statistics")
         }
     }
-    
+
     private func loadRecentMoods() {
-        if let data = userDefaults.data(forKey: "recentMoods"),
-           let moods = try? JSONDecoder().decode([Mood].self, from: data) {
-            recentMoods = moods
-        }
+        // Attempts [EnhancedMood] decode; silently drops stale [Mood] data on first launch after upgrade
+        guard let data = userDefaults.data(forKey: "recentMoodsEnhanced"),
+              let moods = try? JSONDecoder().decode([EnhancedMood].self, from: data) else { return }
+        recentMoods = moods
     }
-    
+
     private func saveRecentMoods() {
         if let data = try? JSONEncoder().encode(recentMoods) {
-            userDefaults.set(data, forKey: "recentMoods")
+            userDefaults.set(data, forKey: "recentMoodsEnhanced")
         }
     }
-    
+
     private func loadFavoriteMoods() {
-        if let data = userDefaults.data(forKey: "favoriteMoods"),
-           let moods = try? JSONDecoder().decode([Mood].self, from: data) {
-            favoriteMoods = moods
-        }
+        guard let data = userDefaults.data(forKey: "favoriteMoodsEnhanced"),
+              let moods = try? JSONDecoder().decode([EnhancedMood].self, from: data) else { return }
+        favoriteMoods = moods
     }
-    
+
     private func saveFavoriteMoods() {
         if let data = try? JSONEncoder().encode(favoriteMoods) {
-            userDefaults.set(data, forKey: "favoriteMoods")
+            userDefaults.set(data, forKey: "favoriteMoodsEnhanced")
         }
     }
-    
-    private func addToRecentMoods(_ mood: Mood) {
-        // Remove if already exists
+
+    private func addToRecentMoods(_ mood: EnhancedMood) {
         recentMoods.removeAll { $0.id == mood.id }
-        
-        // Add to beginning
         recentMoods.insert(mood, at: 0)
-        
-        // Keep only last 10
-        if recentMoods.count > 10 {
-            recentMoods = Array(recentMoods.prefix(10))
-        }
-        
+        if recentMoods.count > 10 { recentMoods = Array(recentMoods.prefix(10)) }
         saveRecentMoods()
     }
-    
+
     private func updateStatistics() {
         statistics.mostUsedProvider = provider
         saveStatistics()
